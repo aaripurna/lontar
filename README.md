@@ -1,7 +1,19 @@
-# Tauri + Vanilla
+# lontar
 
-This template should help get you started developing with Tauri in vanilla HTML, CSS and Javascript.
+Tauri 2 + Svelte 5 (Vite) app for desktop and Android.
 
-## Recommended IDE Setup
+## Development
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+```sh
+bun install
+bun run tauri dev            # desktop
+bun run tauri android dev    # Android emulator or device
+```
+
+## Release
+
+Bump `version` in `src-tauri/tauri.conf.json`, then push a `v*` tag. CI builds a signed APK and attaches it to the GitHub release.
+
+## License
+
+GPL-3.0-or-later

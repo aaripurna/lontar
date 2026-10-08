@@ -1,18 +1,7 @@
-const { invoke } = window.__TAURI__.core;
+import { mount } from "svelte";
+import "./app.css";
+import App from "./App.svelte";
 
-let greetInputEl;
-let greetMsgEl;
+const app = mount(App, { target: document.getElementById("app") });
 
-async function greet() {
-  // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-  greetMsgEl.textContent = await invoke("greet", { name: greetInputEl.value });
-}
-
-window.addEventListener("DOMContentLoaded", () => {
-  greetInputEl = document.querySelector("#greet-input");
-  greetMsgEl = document.querySelector("#greet-msg");
-  document.querySelector("#greet-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    greet();
-  });
-});
+export default app;

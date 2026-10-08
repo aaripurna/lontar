@@ -32,8 +32,10 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Install tauri-cli
-        run: cargo install tauri-cli --version "^2" --locked
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
 
       - name: Set up signing key
         working-directory: src-tauri/gen/android
@@ -46,7 +48,7 @@ jobs:
           } > keystore.properties
 
       - name: Build APK
-        run: cargo tauri android build --apk
+        run: bun run tauri android build --apk
 
       - name: Rename APK
         run: |
