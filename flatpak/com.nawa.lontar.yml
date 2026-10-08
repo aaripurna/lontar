@@ -1,0 +1,32 @@
+# Repackages the .deb produced by `bun run tauri build --bundles deb`.
+# CI copies it to flatpak/lontar.deb before running flatpak-builder.
+# For Flathub, replace the `path: lontar.deb` source with the release URL + sha256.
+id: com.nawa.lontar
+runtime: org.gnome.Platform
+runtime-version: "51"
+sdk: org.gnome.Sdk
+command: lontar
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --share=ipc
+modules:
+  - name: lontar
+    buildsystem: simple
+    sources:
+      - type: file
+        path: lontar.deb
+      - type: file
+        path: com.nawa.lontar.metainfo.xml
+    build-commands:
+      - mkdir deb-extract
+      - ar -x lontar.deb --output deb-extract
+      - tar -C deb-extract -xf deb-extract/data.tar.gz
+      - install -Dm755 deb-extract/usr/bin/lontar /app/bin/lontar
+      - sed -i 's/^Icon=.*/Icon=com.nawa.lontar/' deb-extract/usr/share/applications/lontar.desktop
+      - install -Dm644 deb-extract/usr/share/applications/lontar.desktop /app/share/applications/com.nawa.lontar.desktop
+      - install -Dm644 deb-extract/usr/share/icons/hicolor/32x32/apps/lontar.png /app/share/icons/hicolor/32x32/apps/com.nawa.lontar.png
+      - install -Dm644 deb-extract/usr/share/icons/hicolor/128x128/apps/lontar.png /app/share/icons/hicolor/128x128/apps/com.nawa.lontar.png
+      - install -Dm644 deb-extract/usr/share/icons/hicolor/256x256@2/apps/lontar.png /app/share/icons/hicolor/256x256@2/apps/com.nawa.lontar.png
+      - install -Dm644 com.nawa.lontar.metainfo.xml /app/share/metainfo/com.nawa.lontar.metainfo.xml
