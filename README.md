@@ -12,7 +12,7 @@ bun run tauri android dev    # Android emulator or device
 
 ## Release
 
-Bump `version` in `src-tauri/tauri.conf.json`, then push a `v*` tag. CI builds a signed APK and attaches it to the GitHub release.
+Bump `version` in `src-tauri/tauri.conf.json`, then push a `v*` tag. CI builds a signed Android APK, a universal macOS DMG, a Linux `.deb` and a Flatpak bundle, and attaches them to the GitHub release.
 
 ## License
 
