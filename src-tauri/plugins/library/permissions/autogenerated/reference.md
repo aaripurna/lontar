@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows picking library folders, scanning them for ebooks, opening books, and reading and writing each book's .lontar sidecar.
+Allows picking library folders, scanning them for ebooks, opening books, and reading and writing each book's .lontar sidecar, and colouring the system bars.
 
 #### This default permission set includes the following:
 
@@ -12,6 +12,7 @@ Allows picking library folders, scanning them for ebooks, opening books, and rea
 - `allow-write-sidecar`
 - `allow-read-sidecar-conflicts`
 - `allow-delete-sidecar-conflict`
+- `allow-set-bar-colors`
 
 ## Permission Table
 
@@ -200,6 +201,32 @@ Enables the scan command without any pre-configured scope.
 <td>
 
 Denies the scan command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:allow-set-bar-colors`
+
+</td>
+<td>
+
+Enables the set_bar_colors command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:deny-set-bar-colors`
+
+</td>
+<td>
+
+Denies the set_bar_colors command without any pre-configured scope.
 
 </td>
 </tr>

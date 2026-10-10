@@ -92,6 +92,41 @@ body {
 
 .books li {
   border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+  /* reading progress, as a thin bar along the bottom of the row */
+  background: linear-gradient(#396cd8, #396cd8) left bottom / calc(var(--progress, 0) * 100%) 2px
+    no-repeat;
+}
+
+.books .size.read {
+  color: #396cd8;
+  opacity: 1;
+  font-weight: 600;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+}
+
+.sort {
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+}
+
+.sort button {
+  padding: 0.3em 0.8em;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 0.875em;
+}
+
+.sort button[aria-pressed="true"] {
+  background-color: #396cd8;
+  color: #ffffff;
 }
 
 .books .book {

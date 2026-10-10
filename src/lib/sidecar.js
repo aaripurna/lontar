@@ -64,6 +64,15 @@ function parse(contents, name) {
   return null;
 }
 
+/**
+ * Returns the reading progress from a scanned book's sidecar (`book.sidecar`, as returned by
+ * `plugin:library|scan`), or null.
+ */
+export function scannedProgress(book) {
+  if (!book.sidecar) return null;
+  return parse(book.sidecar, book.fileName + ".lontar")?.progress ?? null;
+}
+
 async function write(book, data) {
   const { version, ...rest } = data;
   const contents = JSON.stringify({ version: SIDECAR_VERSION, ...rest }, null, 2) + "\n";

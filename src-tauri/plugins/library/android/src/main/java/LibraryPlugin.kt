@@ -2,10 +2,12 @@ package com.nawa.lontar.library
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import androidx.activity.result.ActivityResult
+import androidx.core.view.WindowCompat
 import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -32,6 +34,12 @@ class BookArgs {
 }
 
 @InvokeArg
+class BarColorsArgs {
+  lateinit var color: String
+  var dark: Boolean = false
+}
+
+@InvokeArg
 class ConflictArgs {
   lateinit var folderId: String
   // Parent document id of the book.
@@ -48,6 +56,8 @@ class SidecarArgs {
   lateinit var sidecarName: String
   var contents: String? = null
 }
+
+private const val SIDECAR_SUFFIX = ".lontar"
 
 private const val READ_WRITE =
   Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
@@ -254,6 +264,23 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
     }.start()
   }
 
+  // The app draws edge-to-edge, with MainActivity padding the content view clear of the system
+  // bars, so that padding is what shows behind them.
+  @Command
+  fun setBarColors(invoke: Invoke) {
+    val args = invoke.parseArgs(BarColorsArgs::class.java)
+    val color = Color.parseColor(args.color)
+    activity.runOnUiThread {
+      val window = activity.window
+      activity.findViewById<android.view.View>(android.R.id.content).setBackgroundColor(color)
+      WindowCompat.getInsetsController(window, window.decorView).apply {
+        isAppearanceLightStatusBars = !args.dark
+        isAppearanceLightNavigationBars = !args.dark
+      }
+      invoke.resolve()
+    }
+  }
+
   private fun findChild(treeUri: Uri, parentId: String, name: String): Uri? {
     val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
     val columns = arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME)
@@ -276,6 +303,8 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
       Document.COLUMN_SIZE,
     )
     val subdirs = mutableListOf<String>()
+    val found = mutableListOf<JSObject>()
+    val sidecars = mutableMapOf<String, String>() // file name -> document id
     activity.contentResolver.query(childrenUri, columns, null, null, null)?.use { cursor ->
       while (cursor.moveToNext()) {
         val docId = cursor.getString(0) ?: continue
@@ -284,6 +313,10 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
 
         if (cursor.getString(2) == Document.MIME_TYPE_DIR) {
           subdirs.add(docId)
+          continue
+        }
+        if (name.endsWith(SIDECAR_SUFFIX)) {
+          sidecars[name] = docId
           continue
         }
         val dot = name.lastIndexOf('.')
@@ -298,8 +331,22 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
         book.put("dir", parentId)
         book.put("format", format)
         book.put("size", if (cursor.isNull(3)) 0L else cursor.getLong(3))
-        books.put(book)
+        found.add(book)
       }
+    }
+    // Attach each book's sidecar, so the library can show progress without a read per book.
+    for (book in found) {
+      sidecars[book.getString("fileName") + SIDECAR_SUFFIX]?.let { docId ->
+        try {
+          val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+          activity.contentResolver.openInputStream(uri)?.use {
+            book.put("sidecar", it.readBytes().toString(Charsets.UTF_8))
+          }
+        } catch (e: Exception) {
+          // Leave it out; opening the book reports the problem.
+        }
+      }
+      books.put(book)
     }
     for (dir in subdirs) {
       collectEbooks(treeUri, dir, books)

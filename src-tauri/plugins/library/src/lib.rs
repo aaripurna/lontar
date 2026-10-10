@@ -58,6 +58,10 @@ pub struct Ebook {
     pub folder_id: String,
     pub format: String,
     pub size: u64,
+    /// Raw contents of the book's sidecar, if it has one, so the library can show progress
+    /// without a read per book. Conflict copies aren't merged here; opening the book does that.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sidecar: Option<String>,
 }
 
 /// Identifies a book's sidecar. Mirrors the fields of [`Ebook`] that locate it.
@@ -248,6 +252,23 @@ async fn delete_sidecar_conflict<R: Runtime>(
         .map_err(|e| e.to_string())?
 }
 
+/// Colours the area behind the system status and navigation bars, and picks light or dark
+/// icons for them. Only Android needs this; elsewhere the app draws behind the bars itself.
+#[tauri::command]
+fn set_bar_colors<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    color: String,
+    dark: bool,
+) -> Result<(), String> {
+    let valid = color.len() == 7
+        && color.starts_with('#')
+        && color[1..].chars().all(|c| c.is_ascii_hexdigit());
+    if !valid {
+        return Err(format!("Expected a #rrggbb colour, got {color}"));
+    }
+    app.state::<Library<R>>().set_bar_colors(&color, dark)
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("library")
         .invoke_handler(tauri::generate_handler![
@@ -258,7 +279,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             read_sidecar,
             write_sidecar,
             read_sidecar_conflicts,
-            delete_sidecar_conflict
+            delete_sidecar_conflict,
+            set_bar_colors
         ])
         .setup(|app, api| {
             #[cfg(desktop)]

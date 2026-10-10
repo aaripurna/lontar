@@ -3,18 +3,25 @@
   import { invoke } from "@tauri-apps/api/core";
   import "foliate-js/view.js";
   import { loadBookData, saveBookData } from "./lib/sidecar.js";
+  import { setBarColors } from "./lib/bars.js";
 
   // `book` is an entry from the `plugin:library|scan` result.
-  let { book, onclose } = $props();
+  // `onprogress(book, progress)` is called whenever the reading progress changes.
+  let props = $props();
+  // A Reader shows a single book for its whole life (App keys it by path), so pin it: props are
+  // read live, and the final save runs during teardown, when App has already cleared them.
+  const book = props.book;
+  const onprogress = props.onprogress;
+  const onclose = props.onclose;
 
   // Formats the bundled foliate-js can render. PDF needs pdf.js, which it doesn't ship.
   const SUPPORTED = new Set(["epub", "mobi", "azw", "azw3", "kf8", "fb2", "cbz"]);
 
-  // Page colours per theme. The reader's own bars use the same values (see app.css).
+  // Page colours per theme; `chrome` is the reader's bars. Keep in sync with app.css.
   const THEMES = {
-    light: { bg: "#ffffff", fg: "#1a1a1a", link: "#2a5db0", scheme: "light" },
-    sepia: { bg: "#f4ecd8", fg: "#5b4636", link: "#8a5a2b", scheme: "light" },
-    dark: { bg: "#1c1c1e", fg: "#d8d8d8", link: "#8ab4f8", scheme: "dark" },
+    light: { bg: "#ffffff", fg: "#1a1a1a", link: "#2a5db0", chrome: "#f3f3f3", scheme: "light" },
+    sepia: { bg: "#f4ecd8", fg: "#5b4636", link: "#8a5a2b", chrome: "#ebe1c8", scheme: "light" },
+    dark: { bg: "#1c1c1e", fg: "#d8d8d8", link: "#8ab4f8", chrome: "#2a2a2c", scheme: "dark" },
   };
   const FONT_SIZES = [80, 90, 100, 110, 120, 135, 150, 175, 200];
   const LINE_HEIGHTS = { Compact: 1.3, Normal: 1.5, Relaxed: 1.8 };
@@ -77,6 +84,10 @@
   const darkQuery = matchMedia("(prefers-color-scheme: dark)");
   let systemDark = $state(darkQuery.matches);
   let theme = $derived(settings.theme === "auto" ? (systemDark ? "dark" : "light") : settings.theme);
+
+  $effect(() => {
+    setBarColors(THEMES[theme].chrome, THEMES[theme].scheme === "dark");
+  });
 
   $effect(() => {
     const css = bookCSS(settings, THEMES[theme]);
@@ -225,6 +236,7 @@
     pendingProgress = null;
     savedLocation = progress.location;
     bookData = { ...bookData, progress };
+    onprogress?.(book, progress);
     saveBookData(book, bookData).then(
       () => (saveError = ""),
       (e) => (saveError = String(e)),
@@ -259,6 +271,8 @@
 
     try {
       bookData = (await loadBookData(book)) ?? {};
+      // Merging sync-conflict copies may have changed it since the scan.
+      if (bookData.progress) onprogress?.(book, bookData.progress);
     } catch (e) {
       saveError = `Couldn't read saved progress: ${e}`;
     }

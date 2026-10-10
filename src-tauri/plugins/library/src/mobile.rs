@@ -78,6 +78,12 @@ struct CopyBookResponse {
     path: String,
 }
 
+#[derive(Serialize)]
+struct BarColorsArgs<'a> {
+    color: &'a str,
+    dark: bool,
+}
+
 #[derive(Deserialize)]
 struct ReadSidecarResponse {
     contents: Option<String>,
@@ -161,6 +167,16 @@ impl<R: Runtime> Library<R> {
         };
         self.0
             .run_mobile_plugin::<()>("deleteSidecarFile", args)
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn set_bar_colors(&self, color: &str, dark: bool) -> Result<(), String> {
+        // On iOS the web view already extends behind the status bar and home indicator.
+        if cfg!(target_os = "ios") {
+            return Ok(());
+        }
+        self.0
+            .run_mobile_plugin::<()>("setBarColors", BarColorsArgs { color, dark })
             .map_err(|e| e.to_string())
     }
 }

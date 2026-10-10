@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-set-bar-colors"
+description = "Enables the set_bar_colors command without any pre-configured scope."
+commands.allow = ["set_bar_colors"]
+
+[[permission]]
+identifier = "deny-set-bar-colors"
+description = "Denies the set_bar_colors command without any pre-configured scope."
+commands.deny = ["set_bar_colors"]

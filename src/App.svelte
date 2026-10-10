@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import Reader from "./Reader.svelte";
+  import { scannedProgress } from "./lib/sidecar.js";
+  import { setBarColors } from "./lib/bars.js";
 
   const FOLDERS_KEY = "lontar.libraryFolders";
   // Older builds saved a single folder under this key.
@@ -17,6 +19,44 @@
   let error = $state("");
   // The book being read, or null while browsing the library.
   let reading = $state(null);
+  // book path -> reading progress ({ fraction, updatedAt, ... }) from its sidecar
+  let progress = $state({});
+
+  const SORT_KEY = "lontar.librarySort";
+  let sortBy = $state(loadSort()); // "title" or "recent"
+  // Books arrive sorted by title. Recent puts the most recently read first; the sort is
+  // stable, so unread books keep their title order at the end.
+  let sortedBooks = $derived(
+    sortBy === "recent"
+      ? [...books].sort((a, b) =>
+          (progress[b.path]?.updatedAt ?? "").localeCompare(progress[a.path]?.updatedAt ?? ""),
+        )
+      : books,
+  );
+
+  const percent = new Intl.NumberFormat(undefined, { style: "percent" });
+
+  // Colours match app.css's background for the library.
+  const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+  let systemDark = $state(darkQuery.matches);
+  $effect(() => {
+    if (!reading) setBarColors(systemDark ? "#2f2f2f" : "#f6f6f6", systemDark);
+  });
+
+  function loadSort() {
+    try {
+      return localStorage.getItem(SORT_KEY) === "recent" ? "recent" : "title";
+    } catch {
+      return "title";
+    }
+  }
+
+  function setSort(value) {
+    sortBy = value;
+    try {
+      localStorage.setItem(SORT_KEY, value);
+    } catch {}
+  }
 
   function loadFolders() {
     try {
@@ -46,7 +86,11 @@
     error = "";
     try {
       const result = await invoke("plugin:library|scan", { ids: folders.map((f) => f.id) });
-      books = result.books;
+      progress = Object.fromEntries(
+        result.books.map((b) => [b.path, scannedProgress(b)]).filter(([, p]) => p),
+      );
+      // The sidecar text was only needed for the progress.
+      books = result.books.map(({ sidecar, ...book }) => book);
       folderErrors = Object.fromEntries(result.errors.map((e) => [e.folderId, e.message]));
     } catch (e) {
       error = String(e);
@@ -89,7 +133,12 @@
     return `${bytes.toFixed(1)} ${units[i]}`;
   }
 
-  onMount(refresh);
+  onMount(() => {
+    refresh();
+    const onSchemeChange = (e) => (systemDark = e.matches);
+    darkQuery.addEventListener("change", onSchemeChange);
+    return () => darkQuery.removeEventListener("change", onSchemeChange);
+  });
 </script>
 
 <main class="container">
@@ -131,14 +180,25 @@
   {:else if books.length === 0}
     <p class="status">No ebooks found in these folders.</p>
   {:else}
-    <p class="status">{books.length} {books.length === 1 ? "book" : "books"}</p>
+    <div class="list-header">
+      <p class="status">{books.length} {books.length === 1 ? "book" : "books"}</p>
+      <div class="sort" role="group" aria-label="Sort books">
+        <button aria-pressed={sortBy === "title"} onclick={() => setSort("title")}>Title</button>
+        <button aria-pressed={sortBy === "recent"} onclick={() => setSort("recent")}>Recent</button>
+      </div>
+    </div>
     <ul class="books">
-      {#each books as book (book.path)}
-        <li>
+      {#each sortedBooks as book (book.path)}
+        {@const read = progress[book.path]}
+        <li style:--progress={read?.fraction ?? 0}>
           <button class="book" title={book.path} onclick={() => (reading = book)}>
             <span class="format">{book.format}</span>
             <span class="name">{book.name}</span>
-            <span class="size">{formatSize(book.size)}</span>
+            {#if read}
+              <span class="size read">{percent.format(read.fraction ?? 0)}</span>
+            {:else}
+              <span class="size">{formatSize(book.size)}</span>
+            {/if}
           </button>
         </li>
       {/each}
@@ -148,6 +208,10 @@
 
 {#if reading}
   {#key reading.path}
-    <Reader book={reading} onclose={() => (reading = null)} />
+    <Reader
+      book={reading}
+      onclose={() => (reading = null)}
+      onprogress={(book, p) => (progress[book.path] = p)}
+    />
   {/key}
 {/if}

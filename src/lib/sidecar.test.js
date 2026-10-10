@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mergeBookData } from "./sidecar.js";
+import { mergeBookData, scannedProgress } from "./sidecar.js";
 
 describe("mergeBookData", () => {
   test("keeps the newest progress", () => {
@@ -50,5 +50,18 @@ describe("mergeBookData", () => {
 
   test("doesn't add empty lists", () => {
     expect(mergeBookData({ progress: { location: "a" } })).not.toHaveProperty("bookmarks");
+  });
+});
+
+describe("scannedProgress", () => {
+  test("reads progress from the scanned sidecar text", () => {
+    const progress = { location: "a", fraction: 0.5, updatedAt: "2026-10-10T10:00:00.000Z" };
+    expect(scannedProgress({ fileName: "x.epub", sidecar: JSON.stringify({ progress }) })).toEqual(progress);
+  });
+
+  test("returns null without a sidecar, without progress, or for unreadable JSON", () => {
+    expect(scannedProgress({ fileName: "x.epub" })).toBeNull();
+    expect(scannedProgress({ fileName: "x.epub", sidecar: "{}" })).toBeNull();
+    expect(scannedProgress({ fileName: "x.epub", sidecar: "{oops" })).toBeNull();
   });
 });

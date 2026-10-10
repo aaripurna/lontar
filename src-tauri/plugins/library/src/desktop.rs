@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use tauri::{plugin::PluginApi, AppHandle, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::{BookRef, Ebook, Folder, SidecarFile, SidecarRef, EBOOK_EXTENSIONS};
+use crate::{BookRef, Ebook, Folder, SidecarFile, SidecarRef, EBOOK_EXTENSIONS, SIDECAR_EXTENSION};
 
 pub fn init<R: Runtime, C: DeserializeOwned>(app: &AppHandle<R>, _api: PluginApi<R, C>) -> Library<R> {
     Library(app.clone())
@@ -62,6 +62,11 @@ impl<R: Runtime> Library<R> {
 
     pub fn read_sidecar_conflicts(&self, book: &SidecarRef) -> Result<Vec<SidecarFile>, String> {
         read_sidecar_conflicts(book)
+    }
+
+    /// Nothing to do: desktop windows draw their own title bar.
+    pub fn set_bar_colors(&self, _color: &str, _dark: bool) -> Result<(), String> {
+        Ok(())
     }
 
     /// `name` has already been checked by the caller.
@@ -150,17 +155,20 @@ fn collect_ebooks(dir: &Path, books: &mut Vec<Ebook>) {
             collect_ebooks(&path, books);
         } else if file_type.is_file() {
             if let Some(format) = ebook_format(&path) {
+                let file_name = entry.file_name().to_string_lossy().into_owned();
+                let sidecar = path.with_file_name(format!("{file_name}.{SIDECAR_EXTENSION}"));
                 books.push(Ebook {
                     name: path
                         .file_stem()
                         .map(|s| s.to_string_lossy().into_owned())
                         .unwrap_or_default(),
-                    file_name: entry.file_name().to_string_lossy().into_owned(),
+                    file_name,
                     path: path.to_string_lossy().into_owned(),
                     dir: dir.to_string_lossy().into_owned(),
                     folder_id: String::new(),
                     format,
                     size: entry.metadata().map(|m| m.len()).unwrap_or(0),
+                    sidecar: fs::read_to_string(sidecar).ok(),
                 });
             }
         }
@@ -217,6 +225,23 @@ mod tests {
         assert!(book_path(&book(tmp.join("secret.txt"))).is_err());
 
         fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn scan_includes_sidecars() {
+        let library = std::env::temp_dir().join(format!("lontar-scan-{}", std::process::id()));
+        fs::create_dir_all(library.join("Fiction")).unwrap();
+        fs::write(library.join("Dune.epub"), "x").unwrap();
+        fs::write(library.join("Dune.epub.lontar"), r#"{"version":1}"#).unwrap();
+        fs::write(library.join("Fiction/Emma.epub"), "x").unwrap();
+
+        let mut books = Vec::new();
+        collect_ebooks(&library, &mut books);
+        books.sort_by(|a, b| a.name.cmp(&b.name));
+        let sidecars: Vec<_> = books.iter().map(|b| (b.name.as_str(), b.sidecar.as_deref())).collect();
+        assert_eq!(sidecars, [("Dune", Some(r#"{"version":1}"#)), ("Emma", None)]);
+
+        fs::remove_dir_all(&library).unwrap();
     }
 
     #[test]

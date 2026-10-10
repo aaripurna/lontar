@@ -27,6 +27,7 @@ struct Ebook: Encodable {
   let dir: String
   let format: String
   let size: Int
+  let sidecar: String?
 }
 
 struct BookArgs: Decodable {
@@ -276,7 +277,10 @@ class LibraryPlugin: Plugin, UIDocumentPickerDelegate {
           path: url.path,
           dir: url.deletingLastPathComponent().path,
           format: format,
-          size: values.fileSize ?? 0))
+          size: values.fileSize ?? 0,
+          // Lets the library show progress without a read per book.
+          sidecar: try? String(
+            contentsOf: url.appendingPathExtension("lontar"), encoding: .utf8)))
     }
     return books
   }
