@@ -69,6 +69,14 @@ pub struct SidecarRef {
     pub file_name: String,
 }
 
+/// Identifies a book file to open. Mirrors the fields of [`Ebook`] that locate it.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookRef {
+    pub folder_id: String,
+    pub path: String,
+}
+
 impl SidecarRef {
     pub fn sidecar_name(&self) -> Result<String, String> {
         // Never let a crafted name escape the book's directory.
@@ -137,6 +145,19 @@ async fn scan<R: Runtime>(app: tauri::AppHandle<R>, ids: Vec<String>) -> Result<
     .map_err(|e| e.to_string())
 }
 
+/// Returns the book file's bytes, sent to the frontend as an `ArrayBuffer` rather than JSON.
+#[tauri::command]
+async fn read_book<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    book: BookRef,
+) -> Result<tauri::ipc::Response, String> {
+    let library = app.state::<Library<R>>().inner().clone();
+    let bytes = tauri::async_runtime::spawn_blocking(move || library.read_book(&book))
+        .await
+        .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
 /// Returns the book's sidecar contents, or `None` if it has none yet.
 #[tauri::command]
 async fn read_sidecar<R: Runtime>(
@@ -168,6 +189,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             pick_folder,
             release_folder,
             scan,
+            read_book,
             read_sidecar,
             write_sidecar
         ])

@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import Reader from "./Reader.svelte";
 
   const FOLDERS_KEY = "lontar.libraryFolders";
   // Older builds saved a single folder under this key.
@@ -14,6 +15,8 @@
   let folderErrors = $state({});
   let loading = $state(false);
   let error = $state("");
+  // The book being read, or null while browsing the library.
+  let reading = $state(null);
 
   function loadFolders() {
     try {
@@ -131,12 +134,20 @@
     <p class="status">{books.length} {books.length === 1 ? "book" : "books"}</p>
     <ul class="books">
       {#each books as book (book.path)}
-        <li title={book.path}>
-          <span class="format">{book.format}</span>
-          <span class="name">{book.name}</span>
-          <span class="size">{formatSize(book.size)}</span>
+        <li>
+          <button class="book" title={book.path} onclick={() => (reading = book)}>
+            <span class="format">{book.format}</span>
+            <span class="name">{book.name}</span>
+            <span class="size">{formatSize(book.size)}</span>
+          </button>
         </li>
       {/each}
     </ul>
   {/if}
 </main>
+
+{#if reading}
+  {#key reading.path}
+    <Reader book={reading} onclose={() => (reading = null)} />
+  {/key}
+{/if}

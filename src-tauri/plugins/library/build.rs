@@ -2,6 +2,7 @@ const COMMANDS: &[&str] = &[
     "pick_folder",
     "release_folder",
     "scan",
+    "read_book",
     "read_sidecar",
     "write_sidecar",
 ];

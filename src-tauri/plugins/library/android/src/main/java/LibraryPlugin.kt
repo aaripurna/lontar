@@ -25,6 +25,13 @@ class FolderArgs {
 }
 
 @InvokeArg
+class BookArgs {
+  lateinit var folderId: String
+  // Document URI of the book.
+  lateinit var path: String
+}
+
+@InvokeArg
 class SidecarArgs {
   lateinit var folderId: String
   // Parent document id of the book.
@@ -107,6 +114,28 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.reject("Lost access to this folder. Please choose it again.")
       } catch (e: Exception) {
         invoke.reject(e.message ?: "Failed to scan folder")
+      }
+    }.start()
+  }
+
+  // Copies the book into the cache for Rust to read; Rust deletes the copy.
+  @Command
+  fun copyBook(invoke: Invoke) {
+    val args = invoke.parseArgs(BookArgs::class.java)
+    Thread {
+      try {
+        if (!args.path.startsWith(args.folderId + "/document/")) {
+          throw Exception("That book is outside the library folder.")
+        }
+        val copy = java.io.File.createTempFile("book", null, activity.cacheDir)
+        val input = activity.contentResolver.openInputStream(Uri.parse(args.path))
+          ?: throw Exception("Couldn't open the book")
+        input.use { src -> copy.outputStream().use { src.copyTo(it) } }
+        invoke.resolve(JSObject().put("path", copy.absolutePath))
+      } catch (e: SecurityException) {
+        invoke.reject("Lost access to this folder. Please add it again.")
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: "Failed to open the book")
       }
     }.start()
   }

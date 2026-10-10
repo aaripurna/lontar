@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use tauri::{plugin::PluginApi, AppHandle, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::{Ebook, Folder, SidecarRef, EBOOK_EXTENSIONS};
+use crate::{BookRef, Ebook, Folder, SidecarRef, EBOOK_EXTENSIONS};
 
 pub fn init<R: Runtime, C: DeserializeOwned>(app: &AppHandle<R>, _api: PluginApi<R, C>) -> Library<R> {
     Library(app.clone())
@@ -48,6 +48,10 @@ impl<R: Runtime> Library<R> {
         Ok(books)
     }
 
+    pub fn read_book(&self, book: &BookRef) -> Result<Vec<u8>, String> {
+        fs::read(book_path(book)?).map_err(|e| e.to_string())
+    }
+
     pub fn read_sidecar(&self, book: &SidecarRef) -> Result<Option<String>, String> {
         read_sidecar(book)
     }
@@ -75,6 +79,16 @@ fn write_sidecar(book: &SidecarRef, contents: &str) -> Result<(), String> {
         let _ = fs::remove_file(&tmp);
         e.to_string()
     })
+}
+
+/// Resolves the book path, refusing anything outside the library folder.
+fn book_path(book: &BookRef) -> Result<PathBuf, String> {
+    let root = fs::canonicalize(&book.folder_id).map_err(|e| e.to_string())?;
+    let path = fs::canonicalize(&book.path).map_err(|e| e.to_string())?;
+    if !path.starts_with(&root) {
+        return Err(format!("{} is outside the library folder", book.path));
+    }
+    Ok(path)
 }
 
 /// Resolves the sidecar path, refusing anything outside the library folder.
@@ -156,6 +170,25 @@ mod tests {
         assert!(sidecar_path(&sidecar(&library, &library.join(".."), "x.epub")).is_err());
         assert!(sidecar_path(&sidecar(&library, &nested, "../../x.epub")).is_err());
         assert!(sidecar_path(&sidecar(&library, &nested, "")).is_err());
+
+        fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn book_path_stays_inside_library_folder() {
+        let tmp = std::env::temp_dir().join(format!("lontar-book-{}", std::process::id()));
+        let library = tmp.join("library");
+        fs::create_dir_all(&library).unwrap();
+        fs::write(library.join("Dune.epub"), "x").unwrap();
+        fs::write(tmp.join("secret.txt"), "x").unwrap();
+        let book = |path: PathBuf| BookRef {
+            folder_id: library.to_string_lossy().into_owned(),
+            path: path.to_string_lossy().into_owned(),
+        };
+
+        assert!(book_path(&book(library.join("Dune.epub"))).is_ok());
+        assert!(book_path(&book(library.join("../secret.txt"))).is_err());
+        assert!(book_path(&book(tmp.join("secret.txt"))).is_err());
 
         fs::remove_dir_all(&tmp).unwrap();
     }

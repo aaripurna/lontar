@@ -1,12 +1,13 @@
 ## Default Permission
 
-Allows picking library folders, scanning them for ebooks, and reading and writing each book's .lontar sidecar.
+Allows picking library folders, scanning them for ebooks, opening books, and reading and writing each book's .lontar sidecar.
 
 #### This default permission set includes the following:
 
 - `allow-pick-folder`
 - `allow-release-folder`
 - `allow-scan`
+- `allow-read-book`
 - `allow-read-sidecar`
 - `allow-write-sidecar`
 
@@ -41,6 +42,32 @@ Enables the pick_folder command without any pre-configured scope.
 <td>
 
 Denies the pick_folder command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:allow-read-book`
+
+</td>
+<td>
+
+Enables the read_book command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:deny-read-book`
+
+</td>
+<td>
+
+Denies the read_book command without any pre-configured scope.
 
 </td>
 </tr>

@@ -29,6 +29,15 @@ struct Ebook: Encodable {
   let size: Int
 }
 
+struct BookArgs: Decodable {
+  let folderId: String
+  let path: String
+}
+
+struct CopyBookResponse: Encodable {
+  let path: String
+}
+
 struct SidecarArgs: Decodable {
   let folderId: String
   let dir: String
@@ -117,6 +126,26 @@ class LibraryPlugin: Plugin, UIDocumentPickerDelegate {
     }
   }
 
+  // Copies the book into the temp dir for Rust to read; Rust deletes the copy.
+  @objc public func copyBook(_ invoke: Invoke) throws {
+    let args = try invoke.parseArgs(BookArgs.self)
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        let copy = try self.withFolder(args.folderId) { root -> URL in
+          let book = URL(fileURLWithPath: args.path).standardizedFileURL
+          guard self.isInside(book, root) else { throw LibraryError.outsideFolder }
+          let copy = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+          try FileManager.default.copyItem(at: book, to: copy)
+          return copy
+        }
+        invoke.resolve(CopyBookResponse(path: copy.path))
+      } catch {
+        invoke.reject(error.localizedDescription)
+      }
+    }
+  }
+
   @objc public func readSidecar(_ invoke: Invoke) throws {
     let args = try invoke.parseArgs(SidecarArgs.self)
     DispatchQueue.global(qos: .userInitiated).async {
@@ -161,12 +190,15 @@ class LibraryPlugin: Plugin, UIDocumentPickerDelegate {
     return try body(root)
   }
 
-  private func sidecarURL(_ root: URL, _ args: SidecarArgs) throws -> URL {
+  private func isInside(_ url: URL, _ root: URL) -> Bool {
     let rootPath = root.standardizedFileURL.path
+    let path = url.standardizedFileURL.path
+    return path == rootPath || path.hasPrefix(rootPath + "/")
+  }
+
+  private func sidecarURL(_ root: URL, _ args: SidecarArgs) throws -> URL {
     let dir = URL(fileURLWithPath: args.dir).standardizedFileURL
-    guard dir.path == rootPath || dir.path.hasPrefix(rootPath + "/") else {
-      throw LibraryError.outsideFolder
-    }
+    guard isInside(dir, root) else { throw LibraryError.outsideFolder }
     return dir.appendingPathComponent(args.sidecarName)
   }
 

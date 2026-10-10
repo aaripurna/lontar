@@ -13,12 +13,16 @@
   "dependencies": {
     "@tauri-apps/api": "^2.12.1",
     "@tauri-apps/plugin-fs": "~2",
-    "@tauri-apps/plugin-opener": "^2.7.0"
+    "@tauri-apps/plugin-opener": "^2.7.0",
+    "foliate-js": "1.0.1"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tauri-apps/cli": "^2.12.1",
     "svelte": "^5.57.2",
     "vite": "^8.3.3"
+  },
+  "patchedDependencies": {
+    "foliate-js@1.0.1": "patches/foliate-js@1.0.1.patch"
   }
 }

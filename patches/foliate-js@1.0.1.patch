@@ -1,0 +1,13 @@
+diff --git a/fixed-layout.js b/fixed-layout.js
+index b648a0da4c07a85d04c53b9be5dbdc0c60b7d47a..c78214d83dd1f3f702fd9594711656e9ee47cf9d 100644
+--- a/fixed-layout.js
++++ b/fixed-layout.js
+@@ -243,7 +243,7 @@ export class FixedLayout extends HTMLElement {
+     }
+     get index() {
+         const spread = this.#spreads[this.#index]
+-        const section = spread?.center ?? (this.side === 'left'
++        const section = spread?.center ?? (this.#side === 'left'
+             ? spread.left ?? spread.right : spread.right ?? spread.left)
+         return this.book.sections.indexOf(section)
+     }

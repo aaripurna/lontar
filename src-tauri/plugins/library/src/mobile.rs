@@ -4,7 +4,7 @@ use tauri::{
     AppHandle, Runtime,
 };
 
-use crate::{Ebook, Folder, SidecarRef};
+use crate::{BookRef, Ebook, Folder, SidecarRef};
 
 #[cfg(target_os = "ios")]
 tauri::ios_plugin_binding!(init_plugin_library);
@@ -60,6 +60,11 @@ struct WriteSidecarArgs<'a> {
 }
 
 #[derive(Deserialize)]
+struct CopyBookResponse {
+    path: String,
+}
+
+#[derive(Deserialize)]
 struct ReadSidecarResponse {
     contents: Option<String>,
 }
@@ -83,6 +88,18 @@ impl<R: Runtime> Library<R> {
             .run_mobile_plugin::<ScanResponse>("scan", FolderArgs { id })
             .map(|r| r.books)
             .map_err(|e| e.to_string())
+    }
+
+    // Books can be tens of MB, too big to pass through the plugin bridge's JSON. The native side
+    // copies the book into the app's cache instead, and it's read and deleted from here.
+    pub fn read_book(&self, book: &BookRef) -> Result<Vec<u8>, String> {
+        let copy = self
+            .0
+            .run_mobile_plugin::<CopyBookResponse>("copyBook", book)
+            .map_err(|e| e.to_string())?;
+        let bytes = std::fs::read(&copy.path).map_err(|e| e.to_string());
+        let _ = std::fs::remove_file(&copy.path);
+        bytes
     }
 
     pub fn read_sidecar(&self, book: &SidecarRef) -> Result<Option<String>, String> {
