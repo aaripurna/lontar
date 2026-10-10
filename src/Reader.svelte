@@ -4,6 +4,7 @@
   import "foliate-js/view.js";
   import { loadBookData, saveBookData } from "./lib/sidecar.js";
   import { setBarColors } from "./lib/bars.js";
+  import { READABLE_FORMATS, openBookFile } from "./lib/formats.js";
 
   // `book` is an entry from the `plugin:library|scan` result.
   // `onprogress(book, progress)` is called whenever the reading progress changes.
@@ -13,9 +14,6 @@
   const book = props.book;
   const onprogress = props.onprogress;
   const onclose = props.onclose;
-
-  // Formats the bundled foliate-js can render, plus PDF through ./lib/foliate-pdf.js.
-  const SUPPORTED = new Set(["epub", "mobi", "azw", "azw3", "kf8", "fb2", "cbz", "pdf"]);
 
   // Page colours per theme; `chrome` is the reader's bars. Keep in sync with app.css.
   const THEMES = {
@@ -249,7 +247,7 @@
   }
 
   async function open() {
-    if (!SUPPORTED.has(book.format)) {
+    if (!READABLE_FORMATS.has(book.format)) {
       throw new Error(`Lontar can't open ${book.format.toUpperCase()} files yet.`);
     }
     const bytes = await invoke("plugin:library|read_book", {
@@ -261,13 +259,7 @@
     view.addEventListener("load", onLoad);
     view.addEventListener("relocate", onRelocate);
     container.append(view);
-    if (book.format === "pdf") {
-      // pdf.js is large, so only load it for PDFs.
-      const { makePDF } = await import("./lib/foliate-pdf.js");
-      await view.open(await makePDF(file));
-    } else {
-      await view.open(file);
-    }
+    await view.open(await openBookFile(file, book.format));
     reflowable = view.book.rendition?.layout !== "pre-paginated";
     toc = flattenToc(view.book.toc);
     opened = true; // applies the reading settings

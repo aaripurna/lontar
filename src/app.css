@@ -145,12 +145,6 @@ body {
     no-repeat;
 }
 
-.books .size.read {
-  color: #396cd8;
-  opacity: 1;
-  font-weight: 600;
-}
-
 .list-header {
   display: flex;
   align-items: center;
@@ -192,31 +186,55 @@ body {
   text-align: left;
 }
 
-.books .format {
+.cover {
   flex: none;
-  width: 3.5em;
-  text-align: center;
-  font-size: 0.7em;
+  width: 44px;
+  height: 64px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(128, 128, 128, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cover-placeholder {
+  font-size: 0.6em;
   font-weight: 600;
   text-transform: uppercase;
-  border-radius: 4px;
-  padding: 0.1em 0;
-  background: rgba(57, 108, 216, 0.15);
-  color: #396cd8;
+  opacity: 0.6;
+}
+
+.book-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
 }
 
 .books .name {
-  flex: 1;
-  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 
-.books .size {
-  flex: none;
+.books .meta {
   font-size: 0.8em;
   opacity: 0.6;
+}
+
+.books .meta .read {
+  color: #396cd8;
+  font-weight: 600;
 }
 
 input,

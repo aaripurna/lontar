@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import Reader from "./Reader.svelte";
+  import Cover from "./Cover.svelte";
+  import { pruneCovers } from "./lib/covers.js";
   import { scannedProgress } from "./lib/sidecar.js";
   import { setBarColors } from "./lib/bars.js";
 
@@ -94,6 +96,8 @@
       );
       // The sidecar text was only needed for the progress.
       books = result.books.map(({ sidecar, ...book }) => book);
+      // With a folder missing, its covers would be dropped and remade later, so wait.
+      if (!result.errors.length) pruneCovers(books).catch((e) => console.warn(e));
       folderErrors = Object.fromEntries(result.errors.map((e) => [e.folderId, e.message]));
     } catch (e) {
       error = String(e);
@@ -249,13 +253,18 @@
           {@const read = progress[book.path]}
           <li style:--progress={read?.fraction ?? 0}>
             <button class="book" title={book.path} onclick={() => (reading = book)}>
-              <span class="format">{book.format}</span>
-              <span class="name">{book.name}</span>
-              {#if read}
-                <span class="size read">{percent.format(read.fraction ?? 0)}</span>
-              {:else}
-                <span class="size">{formatSize(book.size)}</span>
-              {/if}
+              <Cover {book} />
+              <span class="book-text">
+                <span class="name">{book.name}</span>
+                <span class="meta">
+                  {book.format.toUpperCase()} ·
+                  {#if read}
+                    <span class="read">{percent.format(read.fraction ?? 0)}</span>
+                  {:else}
+                    {formatSize(book.size)}
+                  {/if}
+                </span>
+              </span>
             </button>
           </li>
         {/each}
