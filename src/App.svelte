@@ -1,34 +1,78 @@
 <script>
+  import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { open } from "@tauri-apps/plugin-dialog";
 
-  const LAST_DIR_KEY = "lontar.libraryDir";
+  const FOLDERS_KEY = "lontar.libraryFolders";
+  // Older builds saved a single folder under this key.
+  const LEGACY_FOLDER_KEY = "lontar.libraryFolder";
 
-  let dir = $state(null);
+  // [{ id, name }]: id is a path on desktop and an opaque access token on Android/iOS.
+  // Device-local on purpose: these ids mean nothing on another device.
+  let folders = $state(loadFolders());
   let books = $state([]);
+  // folder id -> why it couldn't be scanned
+  let folderErrors = $state({});
   let loading = $state(false);
   let error = $state("");
 
-  async function scan(path) {
+  function loadFolders() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(FOLDERS_KEY));
+      if (saved) return saved;
+      const legacy = JSON.parse(localStorage.getItem(LEGACY_FOLDER_KEY));
+      return legacy ? [legacy] : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveFolders() {
+    try {
+      localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
+      localStorage.removeItem(LEGACY_FOLDER_KEY);
+    } catch {}
+  }
+
+  async function refresh() {
+    if (folders.length === 0) {
+      books = [];
+      folderErrors = {};
+      return;
+    }
     loading = true;
     error = "";
     try {
-      books = await invoke("scan_ebooks", { dir: path });
-      dir = path;
-      try {
-        localStorage.setItem(LAST_DIR_KEY, path);
-      } catch {}
+      const result = await invoke("plugin:library|scan", { ids: folders.map((f) => f.id) });
+      books = result.books;
+      folderErrors = Object.fromEntries(result.errors.map((e) => [e.folderId, e.message]));
     } catch (e) {
       error = String(e);
-      books = [];
     } finally {
       loading = false;
     }
   }
 
-  async function chooseDir() {
-    const picked = await open({ directory: true, defaultPath: dir ?? undefined });
-    if (typeof picked === "string") await scan(picked);
+  async function addFolder() {
+    try {
+      const picked = await invoke("plugin:library|pick_folder");
+      if (!picked || folders.some((f) => f.id === picked.id)) return;
+      folders.push(picked);
+      saveFolders();
+      await refresh();
+    } catch (e) {
+      error = String(e);
+    }
+  }
+
+  async function removeFolder(folder) {
+    try {
+      folders = folders.filter((f) => f.id !== folder.id);
+      saveFolders();
+      await invoke("plugin:library|release_folder", { id: folder.id });
+      await refresh();
+    } catch (e) {
+      error = String(e);
+    }
   }
 
   function formatSize(bytes) {
@@ -42,34 +86,47 @@
     return `${bytes.toFixed(1)} ${units[i]}`;
   }
 
-  $effect(() => {
-    let last = null;
-    try {
-      last = localStorage.getItem(LAST_DIR_KEY);
-    } catch {}
-    if (last) scan(last);
-  });
+  onMount(refresh);
 </script>
 
 <main class="container">
   <header class="toolbar">
-    <button onclick={chooseDir} disabled={loading}>
-      {dir ? "Change folder" : "Choose folder"}
-    </button>
-    {#if dir}
-      <button onclick={() => scan(dir)} disabled={loading}>Rescan</button>
-      <span class="dir" title={dir}>{dir}</span>
+    <button onclick={addFolder} disabled={loading}>Add folder</button>
+    {#if folders.length > 0}
+      <button onclick={refresh} disabled={loading}>Rescan</button>
     {/if}
   </header>
+
+  {#if folders.length > 0}
+    <ul class="folders">
+      {#each folders as folder (folder.id)}
+        <li>
+          <div class="folder-info">
+            <span class="folder-name" title={folder.name}>{folder.name}</span>
+            {#if folderErrors[folder.id]}
+              <span class="error">{folderErrors[folder.id]}</span>
+            {/if}
+          </div>
+          <button
+            class="remove"
+            onclick={() => removeFolder(folder)}
+            disabled={loading}
+            aria-label="Remove {folder.name}"
+            title="Remove folder">×</button
+          >
+        </li>
+      {/each}
+    </ul>
+  {/if}
 
   {#if error}
     <p class="error">{error}</p>
   {:else if loading}
     <p class="status">Scanning…</p>
-  {:else if !dir}
-    <p class="status">Choose a folder to see the ebooks inside it.</p>
+  {:else if folders.length === 0}
+    <p class="status">Add a folder to see the ebooks inside it.</p>
   {:else if books.length === 0}
-    <p class="status">No ebooks found in this folder.</p>
+    <p class="status">No ebooks found in these folders.</p>
   {:else}
     <p class="status">{books.length} {books.length === 1 ? "book" : "books"}</p>
     <ul class="books">

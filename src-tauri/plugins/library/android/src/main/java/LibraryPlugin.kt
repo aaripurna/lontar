@@ -1,0 +1,137 @@
+package com.nawa.lontar.library
+
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
+import android.provider.DocumentsContract
+import android.provider.DocumentsContract.Document
+import androidx.activity.result.ActivityResult
+import app.tauri.annotation.ActivityCallback
+import app.tauri.annotation.Command
+import app.tauri.annotation.InvokeArg
+import app.tauri.annotation.TauriPlugin
+import app.tauri.plugin.Invoke
+import app.tauri.plugin.JSArray
+import app.tauri.plugin.JSObject
+import app.tauri.plugin.Plugin
+
+private val EBOOK_EXTENSIONS = setOf(
+  "epub", "pdf", "mobi", "azw", "azw3", "kf8", "kfx", "fb2", "djvu", "cbz", "cbr", "cb7"
+)
+
+@InvokeArg
+class FolderArgs {
+  lateinit var id: String
+}
+
+// Folders are picked with the Storage Access Framework. The returned tree URI is the folder id;
+// its read permission is persisted so the library can be rescanned after the app restarts, and
+// released when the folder is removed from the library.
+@TauriPlugin
+class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
+
+  @Command
+  fun pickFolder(invoke: Invoke) {
+    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
+      Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+    )
+    startActivityForResult(invoke, intent, "pickFolderResult")
+  }
+
+  @ActivityCallback
+  fun pickFolderResult(invoke: Invoke, result: ActivityResult) {
+    val intent: Intent? = result.data
+    val treeUri: Uri? = intent?.data
+    if (result.resultCode != Activity.RESULT_OK || treeUri == null) {
+      invoke.resolve(JSObject()) // cancelled: `folder` absent
+      return
+    }
+    try {
+      val resolver = activity.contentResolver
+      resolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+      val rootDocUri = DocumentsContract.buildDocumentUriUsingTree(
+        treeUri, DocumentsContract.getTreeDocumentId(treeUri)
+      )
+      var name = treeUri.lastPathSegment ?: treeUri.toString()
+      resolver.query(rootDocUri, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use {
+        if (it.moveToFirst()) name = it.getString(0) ?: name
+      }
+
+      val folder = JSObject()
+      folder.put("id", treeUri.toString())
+      folder.put("name", name)
+      invoke.resolve(JSObject().put("folder", folder))
+    } catch (e: Exception) {
+      invoke.reject(e.message ?: "Failed to open folder")
+    }
+  }
+
+  @Command
+  fun releaseFolder(invoke: Invoke) {
+    val args = invoke.parseArgs(FolderArgs::class.java)
+    try {
+      activity.contentResolver.releasePersistableUriPermission(
+        Uri.parse(args.id), Intent.FLAG_GRANT_READ_URI_PERMISSION
+      )
+    } catch (e: SecurityException) {
+      // Already released, e.g. the user revoked access in system settings.
+    }
+    invoke.resolve()
+  }
+
+  @Command
+  fun scan(invoke: Invoke) {
+    val args = invoke.parseArgs(FolderArgs::class.java)
+    // A large library can take a while to walk; keep it off the caller's thread.
+    Thread {
+      try {
+        val treeUri = Uri.parse(args.id)
+        val books = JSArray()
+        collectEbooks(treeUri, DocumentsContract.getTreeDocumentId(treeUri), books)
+        invoke.resolve(JSObject().put("books", books))
+      } catch (e: SecurityException) {
+        invoke.reject("Lost access to this folder. Please choose it again.")
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: "Failed to scan folder")
+      }
+    }.start()
+  }
+
+  private fun collectEbooks(treeUri: Uri, parentId: String, books: JSArray) {
+    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
+    val columns = arrayOf(
+      Document.COLUMN_DOCUMENT_ID,
+      Document.COLUMN_DISPLAY_NAME,
+      Document.COLUMN_MIME_TYPE,
+      Document.COLUMN_SIZE,
+    )
+    val subdirs = mutableListOf<String>()
+    activity.contentResolver.query(childrenUri, columns, null, null, null)?.use { cursor ->
+      while (cursor.moveToNext()) {
+        val docId = cursor.getString(0) ?: continue
+        val name = cursor.getString(1) ?: continue
+        if (name.startsWith(".")) continue
+
+        if (cursor.getString(2) == Document.MIME_TYPE_DIR) {
+          subdirs.add(docId)
+          continue
+        }
+        val dot = name.lastIndexOf('.')
+        if (dot <= 0) continue
+        val format = name.substring(dot + 1).lowercase()
+        if (format !in EBOOK_EXTENSIONS) continue
+
+        val book = JSObject()
+        book.put("name", name.substring(0, dot))
+        book.put("path", DocumentsContract.buildDocumentUriUsingTree(treeUri, docId).toString())
+        book.put("format", format)
+        book.put("size", if (cursor.isNull(3)) 0L else cursor.getLong(3))
+        books.put(book)
+      }
+    }
+    for (dir in subdirs) {
+      collectEbooks(treeUri, dir, books)
+    }
+  }
+}
