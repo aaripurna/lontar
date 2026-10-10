@@ -378,6 +378,18 @@ button {
   inset: 0;
 }
 
+/* PDF pages are canvases, so the theme can't restyle their text; recolour the rendered page.
+   Sepia multiplies the page onto the sepia background, so white paper becomes exactly
+   --reader-bg; dark inverts it to about #1c1c1c with hues kept. Not applied to comics, where
+   this would spoil the artwork. */
+.reader[data-format="pdf"][data-theme="sepia"] foliate-view::part(filter) {
+  mix-blend-mode: multiply;
+}
+
+.reader[data-format="pdf"][data-theme="dark"] foliate-view::part(filter) {
+  filter: invert(0.89) hue-rotate(180deg);
+}
+
 .reader-page .status,
 .reader-page .error {
   text-align: center;

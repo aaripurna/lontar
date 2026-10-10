@@ -317,7 +317,7 @@
   });
 </script>
 
-<div class="reader" data-theme={theme}>
+<div class="reader" data-theme={theme} data-format={book.format}>
   <header class="reader-bar">
     <button class="back" onclick={close} aria-label="Back to library">‹</button>
     <div class="reader-title">

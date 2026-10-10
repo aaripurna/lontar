@@ -2,11 +2,12 @@
 //
 // Adapted from foliate-js's pdf.js (MIT, https://github.com/johnfactotum/foliate-js), which
 // the npm release (1.0.1) doesn't include. Changes from upstream:
-// - pdf.js comes from the pdfjs-dist package instead of a vendored copy
+// - pdf.js comes from the pdfjs-dist package instead of a vendored copy, using its legacy
+//   build: the modern one needs Chrome 126+ (URL.parse), and Android System WebView can lag
 // - its runtime assets are served from /pdfjs/ (see pdfjsAssets in vite.config.js)
 // - the text and annotation layer styles come from pdfjs-dist's pdf_viewer.css
-import * as pdfjsLib from "pdfjs-dist";
-import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import workerSrc from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import viewerCSS from "pdfjs-dist/web/pdf_viewer.css?raw";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
