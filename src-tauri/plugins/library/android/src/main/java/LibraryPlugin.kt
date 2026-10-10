@@ -32,6 +32,15 @@ class BookArgs {
 }
 
 @InvokeArg
+class ConflictArgs {
+  lateinit var folderId: String
+  // Parent document id of the book.
+  lateinit var dir: String
+  lateinit var prefix: String
+  lateinit var suffix: String
+}
+
+@InvokeArg
 class SidecarArgs {
   lateinit var folderId: String
   // Parent document id of the book.
@@ -191,6 +200,56 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
         )
       } catch (e: Exception) {
         invoke.reject(e.message ?: "Failed to write ${args.sidecarName}")
+      }
+    }.start()
+  }
+
+  // Returns the sync tool's conflict copies of a sidecar; Rust re-checks the names.
+  @Command
+  fun readSidecarConflicts(invoke: Invoke) {
+    val args = invoke.parseArgs(ConflictArgs::class.java)
+    Thread {
+      try {
+        val treeUri = Uri.parse(args.folderId)
+        val resolver = activity.contentResolver
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, args.dir)
+        val columns = arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME)
+        val files = JSArray()
+        resolver.query(childrenUri, columns, null, null, null)?.use { cursor ->
+          while (cursor.moveToNext()) {
+            val name = cursor.getString(1) ?: continue
+            if (!name.startsWith(args.prefix) || !name.endsWith(args.suffix)) continue
+            val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, cursor.getString(0))
+            val contents = resolver.openInputStream(uri)?.use {
+              it.readBytes().toString(Charsets.UTF_8)
+            } ?: continue
+            files.put(JSObject().put("name", name).put("contents", contents))
+          }
+        }
+        invoke.resolve(JSObject().put("files", files))
+      } catch (e: SecurityException) {
+        invoke.reject("Lost access to this folder. Please add it again.")
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: "Failed to read sidecar conflicts")
+      }
+    }.start()
+  }
+
+  // Rust has already checked that the name is a conflict copy.
+  @Command
+  fun deleteSidecarFile(invoke: Invoke) {
+    val args = invoke.parseArgs(SidecarArgs::class.java)
+    Thread {
+      try {
+        val treeUri = Uri.parse(args.folderId)
+        findChild(treeUri, args.dir, args.sidecarName)?.let {
+          DocumentsContract.deleteDocument(activity.contentResolver, it)
+        }
+        invoke.resolve()
+      } catch (e: SecurityException) {
+        invoke.reject("Lontar isn't allowed to change this folder. Try removing it and adding it again.")
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: "Failed to delete ${args.sidecarName}")
       }
     }.start()
   }

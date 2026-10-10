@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-read-sidecar-conflicts"
+description = "Enables the read_sidecar_conflicts command without any pre-configured scope."
+commands.allow = ["read_sidecar_conflicts"]
+
+[[permission]]
+identifier = "deny-read-sidecar-conflicts"
+description = "Denies the read_sidecar_conflicts command without any pre-configured scope."
+commands.deny = ["read_sidecar_conflicts"]

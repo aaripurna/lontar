@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import "foliate-js/view.js";
+  import { loadBookData, saveBookData } from "./lib/sidecar.js";
 
   // `book` is an entry from the `plugin:library|scan` result.
   let { book, onclose } = $props();
@@ -37,6 +38,15 @@
   let fraction = $state(null);
   let loading = $state(true);
   let error = $state("");
+
+  // The book's sidecar data, or null if it couldn't be read, in which case nothing is saved
+  // rather than risk overwriting it.
+  let bookData = null;
+  let ready = false; // ignore the relocations made while restoring the saved position
+  let savedLocation = null;
+  let pendingProgress = null;
+  let saveTimer;
+  let saveError = $state("");
 
   const percent = new Intl.NumberFormat(undefined, { style: "percent" });
 
@@ -109,6 +119,29 @@
   function onRelocate({ detail }) {
     fraction = detail.fraction;
     chapter = detail.tocItem?.label ?? "";
+    if (!ready || !bookData || !detail.cfi || detail.cfi === savedLocation) return;
+    pendingProgress = { location: detail.cfi, fraction: detail.fraction };
+    // Page turns come in bursts; write once the reader settles.
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveProgress, 1000);
+  }
+
+  function saveProgress() {
+    clearTimeout(saveTimer);
+    if (!pendingProgress) return;
+    const progress = { ...pendingProgress, updatedAt: new Date().toISOString() };
+    pendingProgress = null;
+    savedLocation = progress.location;
+    bookData = { ...bookData, progress };
+    saveBookData(book, bookData).then(
+      () => (saveError = ""),
+      (e) => (saveError = String(e)),
+    );
+  }
+
+  // Android may kill a backgrounded app without warning, so save as soon as it's hidden.
+  function onVisibilityChange() {
+    if (document.visibilityState === "hidden") saveProgress();
   }
 
   async function open() {
@@ -129,7 +162,23 @@
     // Comics have no metadata, and foliate-js falls back to the file name.
     const metaTitle = text(view.book.metadata?.title);
     title = metaTitle && metaTitle !== file.name ? metaTitle : book.name;
-    await view.init({});
+
+    try {
+      bookData = (await loadBookData(book)) ?? {};
+    } catch (e) {
+      saveError = `Couldn't read saved progress: ${e}`;
+    }
+    const lastLocation = bookData?.progress?.location;
+    try {
+      await view.init({ lastLocation });
+    } catch (e) {
+      // e.g. a location from a different edition of the book
+      console.warn("Couldn't restore reading position", e);
+      await view.init({});
+    }
+    // Only moving away from where the book opened counts as progress.
+    savedLocation = view.lastLocation?.cfi ?? lastLocation ?? null;
+    ready = true;
   }
 
   // The system back button (Android) and the header's back button both pop this entry.
@@ -141,6 +190,7 @@
     history.pushState({ reader: true }, "");
     window.addEventListener("popstate", onclose);
     document.addEventListener("keydown", onKeydown);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     open()
       .catch((e) => (error = e?.message ?? String(e)))
@@ -149,6 +199,8 @@
     return () => {
       window.removeEventListener("popstate", onclose);
       document.removeEventListener("keydown", onKeydown);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      saveProgress();
       view?.close();
       view?.remove();
     };
@@ -174,5 +226,6 @@
 
   <footer class="reader-bar reader-footer">
     {#if fraction != null}{percent.format(fraction)}{/if}
+    {#if saveError}<span class="save-error" title={saveError}>· progress not saved</span>{/if}
   </footer>
 </div>

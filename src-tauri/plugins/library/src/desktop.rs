@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use tauri::{plugin::PluginApi, AppHandle, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::{BookRef, Ebook, Folder, SidecarRef, EBOOK_EXTENSIONS};
+use crate::{BookRef, Ebook, Folder, SidecarFile, SidecarRef, EBOOK_EXTENSIONS};
 
 pub fn init<R: Runtime, C: DeserializeOwned>(app: &AppHandle<R>, _api: PluginApi<R, C>) -> Library<R> {
     Library(app.clone())
@@ -59,6 +59,15 @@ impl<R: Runtime> Library<R> {
     pub fn write_sidecar(&self, book: &SidecarRef, contents: &str) -> Result<(), String> {
         write_sidecar(book, contents)
     }
+
+    pub fn read_sidecar_conflicts(&self, book: &SidecarRef) -> Result<Vec<SidecarFile>, String> {
+        read_sidecar_conflicts(book)
+    }
+
+    /// `name` has already been checked by the caller.
+    pub fn delete_sidecar_file(&self, book: &SidecarRef, name: &str) -> Result<(), String> {
+        fs::remove_file(sidecar_dir(book)?.join(name)).map_err(|e| e.to_string())
+    }
 }
 
 fn read_sidecar(book: &SidecarRef) -> Result<Option<String>, String> {
@@ -91,14 +100,31 @@ fn book_path(book: &BookRef) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-/// Resolves the sidecar path, refusing anything outside the library folder.
-fn sidecar_path(book: &SidecarRef) -> Result<PathBuf, String> {
+fn read_sidecar_conflicts(book: &SidecarRef) -> Result<Vec<SidecarFile>, String> {
+    let mut files = Vec::new();
+    for entry in fs::read_dir(sidecar_dir(book)?).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if book.is_conflict_name(&name)? {
+            let contents = fs::read_to_string(entry.path()).map_err(|e| e.to_string())?;
+            files.push(SidecarFile { name, contents });
+        }
+    }
+    Ok(files)
+}
+
+/// Resolves the book's directory, refusing anything outside the library folder.
+fn sidecar_dir(book: &SidecarRef) -> Result<PathBuf, String> {
     let root = fs::canonicalize(&book.folder_id).map_err(|e| e.to_string())?;
     let dir = fs::canonicalize(&book.dir).map_err(|e| e.to_string())?;
     if !dir.starts_with(&root) {
         return Err(format!("{} is outside the library folder", book.dir));
     }
-    Ok(dir.join(book.sidecar_name()?))
+    Ok(dir)
+}
+
+fn sidecar_path(book: &SidecarRef) -> Result<PathBuf, String> {
+    Ok(sidecar_dir(book)?.join(book.sidecar_name()?))
 }
 
 fn ebook_format(path: &Path) -> Option<String> {
@@ -191,6 +217,42 @@ mod tests {
         assert!(book_path(&book(tmp.join("secret.txt"))).is_err());
 
         fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn conflict_names() {
+        let book = SidecarRef {
+            folder_id: String::new(),
+            dir: String::new(),
+            file_name: "Dune.epub".into(),
+        };
+        let ok = |name| book.is_conflict_name(name).unwrap();
+        assert!(ok("Dune.epub.sync-conflict-20261010-192000-ABC1234.lontar"));
+        assert!(!ok("Dune.epub.lontar"));
+        assert!(!ok("Dune.epub.sync-conflict-.lontar"));
+        assert!(!ok("Dune.pdf.sync-conflict-20261010-192000-ABC1234.lontar"));
+        assert!(!ok("Dune.epub.sync-conflict-x/../../etc.lontar"));
+        assert!(!ok("Dune.epub"));
+    }
+
+    #[test]
+    fn reads_and_deletes_conflicts() {
+        let library = std::env::temp_dir().join(format!("lontar-cf-{}", std::process::id()));
+        fs::create_dir_all(&library).unwrap();
+        let conflict = "Dune.epub.sync-conflict-20261010-192000-ABC1234.lontar";
+        fs::write(library.join("Dune.epub.lontar"), "main").unwrap();
+        fs::write(library.join(conflict), "theirs").unwrap();
+        fs::write(library.join("Other.epub.sync-conflict-20261010-192000-ABC1234.lontar"), "x").unwrap();
+        let book = sidecar(&library, &library, "Dune.epub");
+
+        let files = read_sidecar_conflicts(&book).unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!((files[0].name.as_str(), files[0].contents.as_str()), (conflict, "theirs"));
+
+        fs::remove_file(sidecar_dir(&book).unwrap().join(conflict)).unwrap();
+        assert!(read_sidecar_conflicts(&book).unwrap().is_empty());
+
+        fs::remove_dir_all(&library).unwrap();
     }
 
     #[test]

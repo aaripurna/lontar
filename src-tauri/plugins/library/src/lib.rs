@@ -88,6 +88,32 @@ impl SidecarRef {
         }
         Ok(format!("{}.{SIDECAR_EXTENSION}", self.file_name))
     }
+
+    /// Syncthing keeps the losing side of a conflict as
+    /// `<name>.sync-conflict-<date>-<time>-<device>.<ext>`, e.g.
+    /// `Dune.epub.sync-conflict-20261010-192000-ABC1234.lontar`.
+    pub fn conflict_affixes(&self) -> Result<(String, String), String> {
+        self.sidecar_name()?;
+        Ok((
+            format!("{}.sync-conflict-", self.file_name),
+            format!(".{SIDECAR_EXTENSION}"),
+        ))
+    }
+
+    pub fn is_conflict_name(&self, name: &str) -> Result<bool, String> {
+        let (prefix, suffix) = self.conflict_affixes()?;
+        Ok(name.len() > prefix.len() + suffix.len()
+            && name.starts_with(&prefix)
+            && name.ends_with(&suffix)
+            && !name.contains(['/', '\\']))
+    }
+}
+
+/// A sidecar conflict copy left by a sync tool.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SidecarFile {
+    pub name: String,
+    pub contents: String,
 }
 
 #[derive(Serialize)]
@@ -183,6 +209,45 @@ async fn write_sidecar<R: Runtime>(
         .map_err(|e| e.to_string())?
 }
 
+/// Returns the book's sidecar conflict copies (see [`SidecarRef::conflict_affixes`]), so the
+/// frontend can merge them into the sidecar.
+#[tauri::command]
+async fn read_sidecar_conflicts<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    book: SidecarRef,
+) -> Result<Vec<SidecarFile>, String> {
+    let library = app.state::<Library<R>>().inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let files = library.read_sidecar_conflicts(&book)?;
+        // Don't trust the native side's filtering alone.
+        let mut kept = Vec::new();
+        for file in files {
+            if book.is_conflict_name(&file.name)? {
+                kept.push(file);
+            }
+        }
+        Ok(kept)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Deletes a conflict copy once it has been merged. Refuses any other file.
+#[tauri::command]
+async fn delete_sidecar_conflict<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    book: SidecarRef,
+    name: String,
+) -> Result<(), String> {
+    if !book.is_conflict_name(&name)? {
+        return Err(format!("{name} is not a sidecar conflict copy"));
+    }
+    let library = app.state::<Library<R>>().inner().clone();
+    tauri::async_runtime::spawn_blocking(move || library.delete_sidecar_file(&book, &name))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("library")
         .invoke_handler(tauri::generate_handler![
@@ -191,7 +256,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             scan,
             read_book,
             read_sidecar,
-            write_sidecar
+            write_sidecar,
+            read_sidecar_conflicts,
+            delete_sidecar_conflict
         ])
         .setup(|app, api| {
             #[cfg(desktop)]

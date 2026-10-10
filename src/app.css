@@ -225,6 +225,10 @@ button {
   justify-content: center;
 }
 
+.reader-footer .save-error {
+  color: #d33;
+}
+
 .reader-page {
   flex: 1;
   min-height: 0;

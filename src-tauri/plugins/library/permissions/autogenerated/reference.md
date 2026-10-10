@@ -10,6 +10,8 @@ Allows picking library folders, scanning them for ebooks, opening books, and rea
 - `allow-read-book`
 - `allow-read-sidecar`
 - `allow-write-sidecar`
+- `allow-read-sidecar-conflicts`
+- `allow-delete-sidecar-conflict`
 
 ## Permission Table
 
@@ -19,6 +21,32 @@ Allows picking library folders, scanning them for ebooks, opening books, and rea
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`library:allow-delete-sidecar-conflict`
+
+</td>
+<td>
+
+Enables the delete_sidecar_conflict command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:deny-delete-sidecar-conflict`
+
+</td>
+<td>
+
+Denies the delete_sidecar_conflict command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
@@ -94,6 +122,32 @@ Enables the read_sidecar command without any pre-configured scope.
 <td>
 
 Denies the read_sidecar command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:allow-read-sidecar-conflicts`
+
+</td>
+<td>
+
+Enables the read_sidecar_conflicts command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:deny-read-sidecar-conflicts`
+
+</td>
+<td>
+
+Denies the read_sidecar_conflicts command without any pre-configured scope.
 
 </td>
 </tr>

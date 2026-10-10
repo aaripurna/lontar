@@ -4,7 +4,7 @@ use tauri::{
     AppHandle, Runtime,
 };
 
-use crate::{BookRef, Ebook, Folder, SidecarRef};
+use crate::{BookRef, Ebook, Folder, SidecarFile, SidecarRef};
 
 #[cfg(target_os = "ios")]
 tauri::ios_plugin_binding!(init_plugin_library);
@@ -57,6 +57,20 @@ struct WriteSidecarArgs<'a> {
     #[serde(flatten)]
     sidecar: SidecarArgs<'a>,
     contents: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ConflictArgs<'a> {
+    #[serde(flatten)]
+    book: &'a SidecarRef,
+    prefix: String,
+    suffix: String,
+}
+
+#[derive(Deserialize)]
+struct ReadConflictsResponse {
+    files: Vec<SidecarFile>,
 }
 
 #[derive(Deserialize)]
@@ -123,6 +137,30 @@ impl<R: Runtime> Library<R> {
         };
         self.0
             .run_mobile_plugin::<()>("writeSidecar", args)
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn read_sidecar_conflicts(&self, book: &SidecarRef) -> Result<Vec<SidecarFile>, String> {
+        let (prefix, suffix) = book.conflict_affixes()?;
+        let args = ConflictArgs {
+            book,
+            prefix,
+            suffix,
+        };
+        self.0
+            .run_mobile_plugin::<ReadConflictsResponse>("readSidecarConflicts", args)
+            .map(|r| r.files)
+            .map_err(|e| e.to_string())
+    }
+
+    /// `name` has already been checked by the caller.
+    pub fn delete_sidecar_file(&self, book: &SidecarRef, name: &str) -> Result<(), String> {
+        let args = SidecarArgs {
+            book,
+            sidecar_name: name.to_owned(),
+        };
+        self.0
+            .run_mobile_plugin::<()>("deleteSidecarFile", args)
             .map_err(|e| e.to_string())
     }
 }

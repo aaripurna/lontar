@@ -7,4 +7,6 @@ permissions = [
   "allow-read-book",
   "allow-read-sidecar",
   "allow-write-sidecar",
+  "allow-read-sidecar-conflicts",
+  "allow-delete-sidecar-conflict",
 ]

@@ -5,6 +5,8 @@ const COMMANDS: &[&str] = &[
     "read_book",
     "read_sidecar",
     "write_sidecar",
+    "read_sidecar_conflicts",
+    "delete_sidecar_conflict",
 ];
 
 fn main() {

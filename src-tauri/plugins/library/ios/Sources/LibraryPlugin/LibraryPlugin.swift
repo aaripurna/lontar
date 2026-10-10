@@ -45,6 +45,22 @@ struct SidecarArgs: Decodable {
   var contents: String?
 }
 
+struct ConflictArgs: Decodable {
+  let folderId: String
+  let dir: String
+  let prefix: String
+  let suffix: String
+}
+
+struct SidecarFile: Encodable {
+  let name: String
+  let contents: String
+}
+
+struct ReadConflictsResponse: Encodable {
+  let files: [SidecarFile]
+}
+
 struct ReadSidecarResponse: Encodable {
   let contents: String?
 }
@@ -170,6 +186,44 @@ class LibraryPlugin: Plugin, UIDocumentPickerDelegate {
         try self.withFolder(args.folderId) { root in
           let url = try self.sidecarURL(root, args)
           try Data((args.contents ?? "").utf8).write(to: url, options: .atomic)
+        }
+        invoke.resolve()
+      } catch {
+        invoke.reject(error.localizedDescription)
+      }
+    }
+  }
+
+  // Returns the sync tool's conflict copies of a sidecar; Rust re-checks the names.
+  @objc public func readSidecarConflicts(_ invoke: Invoke) throws {
+    let args = try invoke.parseArgs(ConflictArgs.self)
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        let files = try self.withFolder(args.folderId) { root -> [SidecarFile] in
+          let dir = URL(fileURLWithPath: args.dir).standardizedFileURL
+          guard self.isInside(dir, root) else { throw LibraryError.outsideFolder }
+          return try FileManager.default.contentsOfDirectory(atPath: dir.path)
+            .filter { $0.hasPrefix(args.prefix) && $0.hasSuffix(args.suffix) }
+            .map { name in
+              SidecarFile(
+                name: name,
+                contents: try String(contentsOf: dir.appendingPathComponent(name), encoding: .utf8))
+            }
+        }
+        invoke.resolve(ReadConflictsResponse(files: files))
+      } catch {
+        invoke.reject(error.localizedDescription)
+      }
+    }
+  }
+
+  // Rust has already checked that the name is a conflict copy.
+  @objc public func deleteSidecarFile(_ invoke: Invoke) throws {
+    let args = try invoke.parseArgs(SidecarArgs.self)
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        try self.withFolder(args.folderId) { root in
+          try FileManager.default.removeItem(at: try self.sidecarURL(root, args))
         }
         invoke.resolve()
       } catch {
