@@ -19,6 +19,9 @@
   let error = $state("");
   // The book being read, or null while browsing the library.
   let reading = $state(null);
+  // "books" (home) or "folders" (managing the library folders).
+  let page = $state("books");
+  let failedFolders = $derived(folders.filter((f) => folderErrors[f.id]).length);
   // book path -> reading progress ({ fraction, updatedAt, ... }) from its sidecar
   let progress = $state({});
 
@@ -122,6 +125,22 @@
     }
   }
 
+  // The folders page is a history entry, so the system back button returns home.
+  function openFolders() {
+    history.pushState({ libraryPage: "folders" }, "");
+    page = "folders";
+  }
+
+  function closeFolders() {
+    history.back(); // onPopState switches the page
+  }
+
+  // The reader keeps its own history entries and can only be opened from home, so a popstate
+  // while on the folders page is always this page's back.
+  function onPopState() {
+    if (page === "folders" && !reading) page = "books";
+  }
+
   function formatSize(bytes) {
     if (bytes < 1024) return `${bytes} B`;
     const units = ["KB", "MB", "GB"];
@@ -137,74 +156,113 @@
     refresh();
     const onSchemeChange = (e) => (systemDark = e.matches);
     darkQuery.addEventListener("change", onSchemeChange);
-    return () => darkQuery.removeEventListener("change", onSchemeChange);
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      darkQuery.removeEventListener("change", onSchemeChange);
+      window.removeEventListener("popstate", onPopState);
+    };
   });
 </script>
 
-<main class="container">
-  <header class="toolbar">
-    <button onclick={addFolder} disabled={loading}>Add folder</button>
-    {#if folders.length > 0}
-      <button onclick={refresh} disabled={loading}>Rescan</button>
-    {/if}
-  </header>
+{#if page === "folders"}
+  <main class="container">
+    <header class="page-header">
+      <button class="back" onclick={closeFolders} aria-label="Back to books">‹</button>
+      <h1>Folders</h1>
+    </header>
 
-  {#if folders.length > 0}
-    <ul class="folders">
-      {#each folders as folder (folder.id)}
-        <li>
-          <div class="folder-info">
-            <span class="folder-name" title={folder.name}>{folder.name}</span>
-            {#if folderErrors[folder.id]}
-              <span class="error">{folderErrors[folder.id]}</span>
-            {/if}
-          </div>
-          <button
-            class="remove"
-            onclick={() => removeFolder(folder)}
-            disabled={loading}
-            aria-label="Remove {folder.name}"
-            title="Remove folder">×</button
-          >
-        </li>
-      {/each}
-    </ul>
-  {/if}
-
-  {#if error}
-    <p class="error">{error}</p>
-  {:else if loading}
-    <p class="status">Scanning…</p>
-  {:else if folders.length === 0}
-    <p class="status">Add a folder to see the ebooks inside it.</p>
-  {:else if books.length === 0}
-    <p class="status">No ebooks found in these folders.</p>
-  {:else}
-    <div class="list-header">
-      <p class="status">{books.length} {books.length === 1 ? "book" : "books"}</p>
-      <div class="sort" role="group" aria-label="Sort books">
-        <button aria-pressed={sortBy === "title"} onclick={() => setSort("title")}>Title</button>
-        <button aria-pressed={sortBy === "recent"} onclick={() => setSort("recent")}>Recent</button>
-      </div>
+    <div class="toolbar">
+      <button onclick={addFolder} disabled={loading}>Add folder</button>
+      {#if folders.length > 0}
+        <button onclick={refresh} disabled={loading}>Rescan</button>
+      {/if}
     </div>
-    <ul class="books">
-      {#each sortedBooks as book (book.path)}
-        {@const read = progress[book.path]}
-        <li style:--progress={read?.fraction ?? 0}>
-          <button class="book" title={book.path} onclick={() => (reading = book)}>
-            <span class="format">{book.format}</span>
-            <span class="name">{book.name}</span>
-            {#if read}
-              <span class="size read">{percent.format(read.fraction ?? 0)}</span>
-            {:else}
-              <span class="size">{formatSize(book.size)}</span>
-            {/if}
-          </button>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-</main>
+
+    {#if error}
+      <p class="error">{error}</p>
+    {/if}
+
+    {#if folders.length === 0}
+      <p class="status">No folders yet. Add one to see the ebooks inside it.</p>
+    {:else}
+      <ul class="folders">
+        {#each folders as folder (folder.id)}
+          <li>
+            <div class="folder-info">
+              <span class="folder-name" title={folder.name}>{folder.name}</span>
+              {#if folderErrors[folder.id]}
+                <span class="error">{folderErrors[folder.id]}</span>
+              {/if}
+            </div>
+            <button
+              class="remove"
+              onclick={() => removeFolder(folder)}
+              disabled={loading}
+              aria-label="Remove {folder.name}"
+              title="Remove folder">×</button
+            >
+          </li>
+        {/each}
+      </ul>
+      <p class="status">{loading ? "Scanning…" : `${books.length} ${books.length === 1 ? "book" : "books"} found`}</p>
+    {/if}
+  </main>
+{:else}
+  <main class="container">
+    <header class="page-header">
+      <h1>Books</h1>
+      {#if folders.length > 0}
+        <button class="header-button" onclick={openFolders}>Folders</button>
+      {/if}
+    </header>
+
+    {#if failedFolders}
+      <button class="notice" onclick={openFolders}>
+        {failedFolders === 1 ? "A folder" : `${failedFolders} folders`} couldn't be read. Manage folders ›
+      </button>
+    {/if}
+
+    {#if error}
+      <p class="error">{error}</p>
+    {:else if loading && books.length === 0}
+      <p class="status">Scanning…</p>
+    {:else if folders.length === 0}
+      <div class="empty">
+        <p>Add a folder to see the ebooks inside it.</p>
+        <button onclick={addFolder}>Add folder</button>
+      </div>
+    {:else if books.length === 0}
+      <div class="empty">
+        <p>No ebooks found in your folders.</p>
+        <button onclick={openFolders}>Manage folders</button>
+      </div>
+    {:else}
+      <div class="list-header">
+        <p class="status">{books.length} {books.length === 1 ? "book" : "books"}</p>
+        <div class="sort" role="group" aria-label="Sort books">
+          <button aria-pressed={sortBy === "title"} onclick={() => setSort("title")}>Title</button>
+          <button aria-pressed={sortBy === "recent"} onclick={() => setSort("recent")}>Recent</button>
+        </div>
+      </div>
+      <ul class="books">
+        {#each sortedBooks as book (book.path)}
+          {@const read = progress[book.path]}
+          <li style:--progress={read?.fraction ?? 0}>
+            <button class="book" title={book.path} onclick={() => (reading = book)}>
+              <span class="format">{book.format}</span>
+              <span class="name">{book.name}</span>
+              {#if read}
+                <span class="size read">{percent.format(read.fraction ?? 0)}</span>
+              {:else}
+                <span class="size">{formatSize(book.size)}</span>
+              {/if}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </main>
+{/if}
 
 {#if reading}
   {#key reading.path}
