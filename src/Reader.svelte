@@ -14,8 +14,8 @@
   const onprogress = props.onprogress;
   const onclose = props.onclose;
 
-  // Formats the bundled foliate-js can render. PDF needs pdf.js, which it doesn't ship.
-  const SUPPORTED = new Set(["epub", "mobi", "azw", "azw3", "kf8", "fb2", "cbz"]);
+  // Formats the bundled foliate-js can render, plus PDF through ./lib/foliate-pdf.js.
+  const SUPPORTED = new Set(["epub", "mobi", "azw", "azw3", "kf8", "fb2", "cbz", "pdf"]);
 
   // Page colours per theme; `chrome` is the reader's bars. Keep in sync with app.css.
   const THEMES = {
@@ -261,7 +261,13 @@
     view.addEventListener("load", onLoad);
     view.addEventListener("relocate", onRelocate);
     container.append(view);
-    await view.open(file);
+    if (book.format === "pdf") {
+      // pdf.js is large, so only load it for PDFs.
+      const { makePDF } = await import("./lib/foliate-pdf.js");
+      await view.open(await makePDF(file));
+    } else {
+      await view.open(file);
+    }
     reflowable = view.book.rendition?.layout !== "pre-paginated";
     toc = flattenToc(view.book.toc);
     opened = true; // applies the reading settings
@@ -313,6 +319,7 @@
       document.removeEventListener("visibilitychange", onVisibilityChange);
       saveProgress();
       view?.close();
+      view?.book?.destroy?.();
       view?.remove();
     };
   });

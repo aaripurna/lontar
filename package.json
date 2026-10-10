@@ -15,7 +15,8 @@
     "@tauri-apps/api": "^2.12.1",
     "@tauri-apps/plugin-fs": "~2",
     "@tauri-apps/plugin-opener": "^2.7.0",
-    "foliate-js": "1.0.1"
+    "foliate-js": "1.0.1",
+    "pdfjs-dist": "5.7.284"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
