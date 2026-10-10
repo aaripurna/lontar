@@ -33,3 +33,9 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+# Xcode 27 / Swift 6.4: iOS release builds fail to link swift-rs runtime symbols
+# (tauri-apps/tauri#16130). Local copy of swift-rs 1.0.8 with Brendonovich/swift-rs#82 applied.
+# Remove once a fixed swift-rs is released.
+[patch.crates-io]
+swift-rs = { path = "vendor/swift-rs" }

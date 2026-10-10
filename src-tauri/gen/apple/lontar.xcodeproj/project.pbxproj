@@ -1,0 +1,460 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0196C4443AA6241E920DF716 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B1B46F884A8EB97F192397B /* QuartzCore.framework */; };
+		03CA5A2569D77214DF427B19 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = B537161BDF5A198011E634FB /* assets */; };
+		37E41EBAEF552BB577DA96BA /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E96903742CE5819BF952562D /* Metal.framework */; };
+		51AA86E93D723430B92832B2 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CDD1338D96647771C3CC48E /* UIKit.framework */; };
+		78290B1EDAF6CF12CCDB7DD6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3705B3F9284D438F33699E34 /* Assets.xcassets */; };
+		7EC4DA67B9056B0F37EAABFB /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 99293EA07FA59C901E64FAE9 /* WebKit.framework */; };
+		816A707D5C264C24AC4F4CA3 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DE70B599E8F37FA9A4865E90 /* Security.framework */; };
+		9EA479FD0A60F23415C8CA62 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 59B297A5EDA7A44B0CFE79F8 /* MetalKit.framework */; };
+		D0D97FC048DF64D7D76732BA /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D8A0276CCDB0DEC93A4B3565 /* CoreGraphics.framework */; };
+		E31CECEB1EE84FF04D433832 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = E5F147DA697F69994A157884 /* main.mm */; };
+		E68A4D2FEF275DB2C3D093A0 /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 21A32CF3AA6A7A59BCA826DC /* libapp.a */; };
+		EAD67A092FB7BFB9E74D3E96 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = DCC2F149D650BB30B7FF68C4 /* LaunchScreen.storyboard */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		049821548F05817250130D85 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		0CDD1338D96647771C3CC48E /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		21A32CF3AA6A7A59BCA826DC /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		26F2C94D1BE22BAE658411A7 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		3705B3F9284D438F33699E34 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		59B297A5EDA7A44B0CFE79F8 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		67537F905E14A066CA067336 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		7B1B46F884A8EB97F192397B /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		7B1E2965B77B26029D791FED /* lontar_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = lontar_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		88CF18C7243CD059CF465C2A /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		99293EA07FA59C901E64FAE9 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		B537161BDF5A198011E634FB /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		D8A0276CCDB0DEC93A4B3565 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		DCC2F149D650BB30B7FF68C4 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		DE70B599E8F37FA9A4865E90 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		DF374E54CABC8CBDC74974E6 /* lontar_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = lontar_iOS.entitlements; sourceTree = "<group>"; };
+		E5F147DA697F69994A157884 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		E96903742CE5819BF952562D /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		904A16B76D0CF72A054678BC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E68A4D2FEF275DB2C3D093A0 /* libapp.a in Frameworks */,
+				D0D97FC048DF64D7D76732BA /* CoreGraphics.framework in Frameworks */,
+				37E41EBAEF552BB577DA96BA /* Metal.framework in Frameworks */,
+				9EA479FD0A60F23415C8CA62 /* MetalKit.framework in Frameworks */,
+				0196C4443AA6241E920DF716 /* QuartzCore.framework in Frameworks */,
+				816A707D5C264C24AC4F4CA3 /* Security.framework in Frameworks */,
+				51AA86E93D723430B92832B2 /* UIKit.framework in Frameworks */,
+				7EC4DA67B9056B0F37EAABFB /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		109B1D14BA82AEA89FE4FE14 = {
+			isa = PBXGroup;
+			children = (
+				B537161BDF5A198011E634FB /* assets */,
+				3705B3F9284D438F33699E34 /* Assets.xcassets */,
+				DCC2F149D650BB30B7FF68C4 /* LaunchScreen.storyboard */,
+				3ECF4E68AE8C6DDB60BC884E /* Externals */,
+				172DC6275900DC99CE7FE9F9 /* lontar_iOS */,
+				2794C99EA9747E743B269EE2 /* Sources */,
+				ED8C033A2FDB7DBB03CB317B /* src */,
+				A01747B37E90F90333AF50EC /* Frameworks */,
+				B4921FD76EA7877D6C41C7E2 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		172DC6275900DC99CE7FE9F9 /* lontar_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				67537F905E14A066CA067336 /* Info.plist */,
+				DF374E54CABC8CBDC74974E6 /* lontar_iOS.entitlements */,
+			);
+			path = lontar_iOS;
+			sourceTree = "<group>";
+		};
+		2794C99EA9747E743B269EE2 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				F1D805C45BEC2B050B28439C /* lontar */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		3ECF4E68AE8C6DDB60BC884E /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		A01747B37E90F90333AF50EC /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D8A0276CCDB0DEC93A4B3565 /* CoreGraphics.framework */,
+				21A32CF3AA6A7A59BCA826DC /* libapp.a */,
+				E96903742CE5819BF952562D /* Metal.framework */,
+				59B297A5EDA7A44B0CFE79F8 /* MetalKit.framework */,
+				7B1B46F884A8EB97F192397B /* QuartzCore.framework */,
+				DE70B599E8F37FA9A4865E90 /* Security.framework */,
+				0CDD1338D96647771C3CC48E /* UIKit.framework */,
+				99293EA07FA59C901E64FAE9 /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		B4921FD76EA7877D6C41C7E2 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7B1E2965B77B26029D791FED /* lontar_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		ED8C033A2FDB7DBB03CB317B /* src */ = {
+			isa = PBXGroup;
+			children = (
+				049821548F05817250130D85 /* lib.rs */,
+				26F2C94D1BE22BAE658411A7 /* main.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		F1D805C45BEC2B050B28439C /* lontar */ = {
+			isa = PBXGroup;
+			children = (
+				E5F147DA697F69994A157884 /* main.mm */,
+				F2B987D89E6300BF8300B589 /* bindings */,
+			);
+			path = lontar;
+			sourceTree = "<group>";
+		};
+		F2B987D89E6300BF8300B589 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				88CF18C7243CD059CF465C2A /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C83EA926ED0A6E6DF20550E0 /* lontar_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 804BC49A45572A79CD7C8E42 /* Build configuration list for PBXNativeTarget "lontar_iOS" */;
+			buildPhases = (
+				849D1EFBA5E02B4E122DE46E /* Build Rust Code */,
+				EDCE5CB11B0E60815571C9C4 /* Sources */,
+				A0B0AAC8E816B7A27A7F0E26 /* Resources */,
+				904A16B76D0CF72A054678BC /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = lontar_iOS;
+			packageProductDependencies = (
+			);
+			productName = lontar_iOS;
+			productReference = 7B1E2965B77B26029D791FED /* lontar_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		36319413CE3CE37BB7B03BCB /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 9A9FB5950A6DF1DBD13B180B /* Build configuration list for PBXProject "lontar" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 109B1D14BA82AEA89FE4FE14;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = B4921FD76EA7877D6C41C7E2 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C83EA926ED0A6E6DF20550E0 /* lontar_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A0B0AAC8E816B7A27A7F0E26 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				78290B1EDAF6CF12CCDB7DD6 /* Assets.xcassets in Resources */,
+				EAD67A092FB7BFB9E74D3E96 /* LaunchScreen.storyboard in Resources */,
+				03CA5A2569D77214DF427B19 /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		849D1EFBA5E02B4E122DE46E /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "bun tauri ios xcode-script -v --platform \"${PLATFORM_DISPLAY_NAME:?}\" --sdk-root \"${SDKROOT:?}\" --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration \"${CONFIGURATION:?}\" ${FORCE_COLOR} ${ARCHS:?}\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		EDCE5CB11B0E60815571C9C4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E31CECEB1EE84FF04D433832 /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		153A90BF0462634EB7B3B12C /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		50D58D16E08EEA3C42467E4A /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = lontar_iOS/lontar_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = lontar_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.nawa.lontar;
+				PRODUCT_NAME = "lontar";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		80E629F170236E7D832C51AB /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = lontar_iOS/lontar_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = lontar_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.nawa.lontar;
+				PRODUCT_NAME = "lontar";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+		9C7481B86972693A7ED1A29E /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		804BC49A45572A79CD7C8E42 /* Build configuration list for PBXNativeTarget "lontar_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				50D58D16E08EEA3C42467E4A /* debug */,
+				80E629F170236E7D832C51AB /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		9A9FB5950A6DF1DBD13B180B /* Build configuration list for PBXProject "lontar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				153A90BF0462634EB7B3B12C /* debug */,
+				9C7481B86972693A7ED1A29E /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 36319413CE3CE37BB7B03BCB /* Project object */;
+}

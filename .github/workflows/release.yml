@@ -107,6 +107,40 @@ jobs:
         with:
           files: lontar-${{ github.ref_name }}-macos-universal.dmg
 
+  ios-ipa:
+    # Unsigned .ipa for sideloading (AltStore / SideStore / Sideloadly re-sign it with the user's Apple ID).
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+          # swift-rs needs llvm-objcopy to re-export Swift symbols on Xcode 27 (tauri-apps/tauri#16130)
+          components: llvm-tools
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Build unsigned IPA
+        run: bun run tauri ios build --target aarch64 --no-sign
+
+      - name: Collect IPA
+        run: cp src-tauri/gen/apple/build/arm64/lontar.ipa "lontar-${GITHUB_REF_NAME}-ios-unsigned.ipa"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: lontar-${{ github.ref_name }}-ios-unsigned.ipa
+
   linux-deb:
     # Oldest supported Ubuntu, so the binary links against an old glibc and runs on more distros.
     runs-on: ubuntu-22.04
