@@ -1,8 +1,72 @@
 diff --git a/fixed-layout.js b/fixed-layout.js
-index b648a0da4c07a85d04c53b9be5dbdc0c60b7d47a..c78214d83dd1f3f702fd9594711656e9ee47cf9d 100644
+index b648a0da4c07a85d04c53b9be5dbdc0c60b7d47a..396480645f053a41fbae1f3c3f6a4fdb074811ab 100644
 --- a/fixed-layout.js
 +++ b/fixed-layout.js
-@@ -243,7 +243,7 @@ export class FixedLayout extends HTMLElement {
+@@ -32,7 +32,7 @@ const getViewport = (doc, viewport) => {
+ }
+ 
+ export class FixedLayout extends HTMLElement {
+-    static observedAttributes = ['zoom']
++    static observedAttributes = ['zoom', 'zoom-factor']
+     #root = this.attachShadow({ mode: 'closed' })
+     #observer = new ResizeObserver(() => this.#render())
+     #spreads
+@@ -45,6 +45,7 @@ export class FixedLayout extends HTMLElement {
+     #center
+     #side
+     #zoom
++    #zoomFactor = 1
+     constructor() {
+         super()
+ 
+@@ -55,7 +56,9 @@ export class FixedLayout extends HTMLElement {
+             height: 100%;
+             display: flex;
+             justify-content: center;
++            justify-content: safe center;
+             align-items: center;
++            align-items: safe center;
+             overflow: auto;
+         }`)
+ 
+@@ -68,6 +71,10 @@ export class FixedLayout extends HTMLElement {
+                     ? parseFloat(value) : value
+                 this.#render()
+                 break
++            case 'zoom-factor':
++                this.#zoomFactor = parseFloat(value) || 1
++                this.#render()
++                break
+         }
+     }
+     async #createFrame({ index, src: srcOption }) {
+@@ -116,7 +123,7 @@ export class FixedLayout extends HTMLElement {
+         const blankWidth = left.width ?? right.width
+         const blankHeight = left.height ?? right.height
+ 
+-        const scale = typeof this.#zoom === 'number' && !isNaN(this.#zoom)
++        const scale = this.#zoomFactor * (typeof this.#zoom === 'number' && !isNaN(this.#zoom)
+             ? this.#zoom
+             : this.#zoom === 'fit-width' ? (portrait || this.#center
+                 ? width / (target.width ?? blankWidth)
+@@ -129,7 +136,7 @@ export class FixedLayout extends HTMLElement {
+                     width / ((left.width ?? blankWidth) + (right.width ?? blankWidth)),
+                     height / Math.max(
+                         left.height ?? blankHeight,
+-                        right.height ?? blankHeight)))
++                        right.height ?? blankHeight))))
+ 
+         const transform = frame => {
+             let { element, iframe, width, height, blank, onZoom } = frame
+@@ -163,6 +170,7 @@ export class FixedLayout extends HTMLElement {
+     }
+     async #showSpread({ left, right, center, side }) {
+         this.#root.replaceChildren()
++        this.scrollTop = 0
+         this.#left = null
+         this.#right = null
+         this.#center = null
+@@ -243,7 +251,7 @@ export class FixedLayout extends HTMLElement {
      }
      get index() {
          const spread = this.#spreads[this.#index]
@@ -11,3 +75,16 @@ index b648a0da4c07a85d04c53b9be5dbdc0c60b7d47a..c78214d83dd1f3f702fd9594711656e9
              ? spread.left ?? spread.right : spread.right ?? spread.left)
          return this.book.sections.indexOf(section)
      }
+@@ -283,6 +291,12 @@ export class FixedLayout extends HTMLElement {
+         }
+         this.#reportLocation(reason)
+     }
++    // Loads the current spread again, e.g. after the book changed how it renders pages.
++    async reload() {
++        const index = this.#index
++        this.#index = -1
++        await this.goToSpread(index, this.#side, 'reload')
++    }
+     async select(target) {
+         await this.goTo(target)
+         // TODO

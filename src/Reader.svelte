@@ -23,11 +23,14 @@
   };
   const FONT_SIZES = [80, 90, 100, 110, 120, 135, 150, 175, 200];
   const LINE_HEIGHTS = { Compact: 1.3, Normal: 1.5, Relaxed: 1.8 };
+  // Fixed-layout pages (PDFs, comics) can't reflow, so they're zoomed instead: a percentage of
+  // the fit-to-screen size. Drag to move around a zoomed page.
+  const ZOOMS = [100, 125, 150, 175, 200, 250];
 
   // Reading settings are per device (a phone and a laptop want different sizes), so they live
   // in localStorage rather than the synced sidecar.
   const SETTINGS_KEY = "lontar.readerSettings";
-  const DEFAULT_SETTINGS = { fontSize: 100, lineHeight: 1.5, theme: "auto" };
+  const DEFAULT_SETTINGS = { fontSize: 100, lineHeight: 1.5, theme: "auto", zoom: 100, trimMargins: false };
 
   function loadSettings() {
     try {
@@ -90,9 +93,18 @@
   $effect(() => {
     const css = bookCSS(settings, THEMES[theme]);
     if (opened) view.renderer.setStyles?.(css);
+    if (opened && !reflowable) view.renderer.setAttribute("zoom-factor", settings.zoom / 100);
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch {}
+  });
+
+  // PDF pages are re-rendered when margin trimming is switched.
+  $effect(() => {
+    const trim = settings.trimMargins;
+    if (!opened || book.format !== "pdf" || view.book.trimMargins === trim) return;
+    view.book.trimMargins = trim;
+    view.renderer.reload();
   });
 
   // The book's sidecar data, or null if it couldn't be read, in which case nothing is saved
@@ -155,6 +167,12 @@
     const i = FONT_SIZES.indexOf(settings.fontSize);
     const next = FONT_SIZES[(i === -1 ? FONT_SIZES.indexOf(100) : i) + step];
     if (next) settings.fontSize = next;
+  }
+
+  function changeZoom(step) {
+    const i = ZOOMS.indexOf(settings.zoom);
+    const next = ZOOMS[(i === -1 ? 0 : i) + step];
+    if (next) settings.zoom = next;
   }
 
   // Keeps the current chapter visible when the contents open.
@@ -259,7 +277,7 @@
     view.addEventListener("load", onLoad);
     view.addEventListener("relocate", onRelocate);
     container.append(view);
-    await view.open(await openBookFile(file, book.format));
+    await view.open(await openBookFile(file, book.format, { trimMargins: settings.trimMargins }));
     reflowable = view.book.rendition?.layout !== "pre-paginated";
     toc = flattenToc(view.book.toc);
     opened = true; // applies the reading settings
@@ -383,6 +401,24 @@
             {/each}
           </div>
         </div>
+      {:else}
+        <div class="sheet-row">
+          <span class="sheet-label">Zoom</span>
+          <div class="segmented">
+            <button onclick={() => changeZoom(-1)} disabled={settings.zoom <= ZOOMS[0]} aria-label="Zoom out">−</button>
+            <span class="sheet-value">{settings.zoom}%</span>
+            <button onclick={() => changeZoom(1)} disabled={settings.zoom >= ZOOMS.at(-1)} aria-label="Zoom in">+</button>
+          </div>
+        </div>
+        {#if book.format === "pdf"}
+          <div class="sheet-row">
+            <span class="sheet-label">Margins</span>
+            <div class="segmented">
+              <button aria-pressed={!settings.trimMargins} onclick={() => (settings.trimMargins = false)}>Keep</button>
+              <button aria-pressed={settings.trimMargins} onclick={() => (settings.trimMargins = true)}>Trim</button>
+            </div>
+          </div>
+        {/if}
       {/if}
 
       <div class="sheet-row">

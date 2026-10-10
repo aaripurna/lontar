@@ -6,17 +6,21 @@
 //   build: the modern one needs Chrome 126+ (URL.parse), and Android System WebView can lag
 // - its runtime assets are served from /pdfjs/ (see pdfjsAssets in vite.config.js)
 // - the text and annotation layer styles come from pdfjs-dist's pdf_viewer.css
+// - optional margin trimming: each page can be shown cropped to its content (see trim.js)
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerSrc from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import viewerCSS from "pdfjs-dist/web/pdf_viewer.css?raw";
+import { inkBounds, trimBox } from "./trim.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 const assetUrl = (dir) => new URL(`/pdfjs/${dir}/`, location.href).href;
 
-const render = async (page, doc, zoom) => {
+// `crop` is the part of the page shown, in PDF units; the whole page is drawn, then shifted.
+const render = async (page, doc, zoom, crop) => {
   const scale = zoom * devicePixelRatio;
-  doc.documentElement.style.transform = `scale(${1 / devicePixelRatio})`;
+  doc.documentElement.style.transform =
+    `scale(${1 / devicePixelRatio}) translate(${-crop.x * scale}px, ${-crop.y * scale}px)`;
   doc.documentElement.style.transformOrigin = "top left";
   doc.documentElement.style.setProperty("--scale-factor", scale);
   const viewport = page.getViewport({ scale });
@@ -69,7 +73,24 @@ const render = async (page, doc, zoom) => {
   });
 };
 
-const renderPage = async (page, getImageBlob) => {
+const TRIM_SAMPLE_WIDTH = 300; // px; pages are rendered this small to find their content
+
+// The part of the page to show when trimming margins, in PDF units.
+const findCrop = async (page) => {
+  const { width, height } = page.getViewport({ scale: 1 });
+  const scale = TRIM_SAMPLE_WIDTH / width;
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  const canvasContext = canvas.getContext("2d", { willReadFrequently: true });
+  await page.render({ canvasContext, viewport }).promise;
+  const ink = inkBounds(canvasContext.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+  const box = ink && { x: ink.x / scale, y: ink.y / scale, width: ink.width / scale, height: ink.height / scale };
+  return trimBox(box, width, height);
+};
+
+const renderPage = async (page, getImageBlob, trim) => {
   const viewport = page.getViewport({ scale: 1 });
   if (getImageBlob) {
     const canvas = document.createElement("canvas");
@@ -79,6 +100,7 @@ const renderPage = async (page, getImageBlob) => {
     await page.render({ canvasContext, viewport }).promise;
     return new Promise((resolve) => canvas.toBlob(resolve));
   }
+  const crop = trim ? await findCrop(page) : { x: 0, y: 0, width: viewport.width, height: viewport.height };
   const src = URL.createObjectURL(
     new Blob(
       [
@@ -86,7 +108,7 @@ const renderPage = async (page, getImageBlob) => {
         <!DOCTYPE html>
         <html lang="en">
         <meta charset="utf-8">
-        <meta name="viewport" content="width=${viewport.width}, height=${viewport.height}">
+        <meta name="viewport" content="width=${crop.width}, height=${crop.height}">
         <style>
         html, body {
             margin: 0;
@@ -111,7 +133,7 @@ const renderPage = async (page, getImageBlob) => {
       { type: "text/html" },
     ),
   );
-  const onZoom = ({ doc, scale }) => render(page, doc, scale);
+  const onZoom = ({ doc, scale }) => render(page, doc, scale, crop);
   return { src, onZoom };
 };
 
@@ -121,7 +143,7 @@ const makeTOCItem = (item) => ({
   subitems: item.items.length ? item.items.map(makeTOCItem) : null,
 });
 
-export const makePDF = async (file) => {
+export const makePDF = async (file, { trimMargins = false } = {}) => {
   const transport = new pdfjsLib.PDFDataRangeTransport(file.size, []);
   transport.requestDataRange = (begin, end) => {
     file
@@ -140,7 +162,7 @@ export const makePDF = async (file) => {
     isEvalSupported: false,
   }).promise;
 
-  const book = { rendition: { layout: "pre-paginated" } };
+  const book = { rendition: { layout: "pre-paginated" }, trimMargins };
 
   const { metadata, info } = (await pdf.getMetadata()) ?? {};
   // TODO: for better results, parse `metadata.getRaw()`
@@ -164,10 +186,12 @@ export const makePDF = async (file) => {
   book.sections = Array.from({ length: pdf.numPages }).map((_, i) => ({
     id: i,
     load: async () => {
-      const cached = cache.get(i);
+      // Changing `book.trimMargins` takes effect as pages are (re)loaded.
+      const key = `${i}:${book.trimMargins}`;
+      const cached = cache.get(key);
       if (cached) return cached;
-      const url = await renderPage(await pdf.getPage(i + 1));
-      cache.set(i, url);
+      const url = await renderPage(await pdf.getPage(i + 1), false, book.trimMargins);
+      cache.set(key, url);
       return url;
     },
     size: 1000,
