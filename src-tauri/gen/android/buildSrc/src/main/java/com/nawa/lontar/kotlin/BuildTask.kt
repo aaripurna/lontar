@@ -23,7 +23,8 @@ abstract class BuildTask : DefaultTask() {
 
     @TaskAction
     fun assemble() {
-        val executable = """cargo""";
+        // Run the Tauri CLI that bun installs (pinned in bun.lock); CI has no `cargo tauri`.
+        val executable = """bun""";
         try {
             runTauriCli(executable)
         } catch (e: Exception) {
@@ -55,7 +56,7 @@ abstract class BuildTask : DefaultTask() {
         val rootDirRel = rootDirRel ?: throw GradleException("rootDirRel cannot be null")
         val target = target ?: throw GradleException("target cannot be null")
         val release = release ?: throw GradleException("release cannot be null")
-        val args = listOf("tauri", "android", "android-studio-script");
+        val args = listOf("run", "tauri", "android", "android-studio-script");
 
         execOperations.exec {
             workingDir(File(projectDir, rootDirRel))
