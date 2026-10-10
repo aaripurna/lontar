@@ -22,9 +22,34 @@ struct PickFolderResponse: Encodable {
 
 struct Ebook: Encodable {
   let name: String
+  let fileName: String
   let path: String
+  let dir: String
   let format: String
   let size: Int
+}
+
+struct SidecarArgs: Decodable {
+  let folderId: String
+  let dir: String
+  let sidecarName: String
+  var contents: String?
+}
+
+struct ReadSidecarResponse: Encodable {
+  let contents: String?
+}
+
+enum LibraryError: LocalizedError {
+  case lostAccess
+  case outsideFolder
+
+  var errorDescription: String? {
+    switch self {
+    case .lostAccess: return "Lost access to this folder. Please add it again."
+    case .outsideFolder: return "That book is outside the library folder."
+    }
+  }
 }
 
 struct ScanResponse: Encodable {
@@ -82,44 +107,92 @@ class LibraryPlugin: Plugin, UIDocumentPickerDelegate {
 
   @objc public func scan(_ invoke: Invoke) throws {
     let args = try invoke.parseArgs(FolderArgs.self)
-    guard let bookmark = Data(base64Encoded: args.id) else {
-      invoke.reject("Invalid folder id")
-      return
-    }
-
     DispatchQueue.global(qos: .userInitiated).async {
-      var stale = false
-      guard
-        let root = try? URL(resolvingBookmarkData: bookmark, bookmarkDataIsStale: &stale)
-      else {
-        invoke.reject("Lost access to this folder. Please choose it again.")
-        return
+      do {
+        let books = try self.withFolder(args.id) { root in self.collectEbooks(root) }
+        invoke.resolve(ScanResponse(books: books))
+      } catch {
+        invoke.reject(error.localizedDescription)
       }
-
-      let accessing = root.startAccessingSecurityScopedResource()
-      defer { if accessing { root.stopAccessingSecurityScopedResource() } }
-
-      var books: [Ebook] = []
-      let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey]
-      // Unreadable subfolders are skipped rather than failing the whole scan.
-      let enumerator = FileManager.default.enumerator(
-        at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles],
-        errorHandler: { _, _ in true })
-      while let url = enumerator?.nextObject() as? URL {
-        let format = url.pathExtension.lowercased()
-        guard ebookExtensions.contains(format),
-          let values = try? url.resourceValues(forKeys: Set(keys)),
-          values.isRegularFile == true
-        else { continue }
-        books.append(
-          Ebook(
-            name: url.deletingPathExtension().lastPathComponent,
-            path: url.path,
-            format: format,
-            size: values.fileSize ?? 0))
-      }
-      invoke.resolve(ScanResponse(books: books))
     }
+  }
+
+  @objc public func readSidecar(_ invoke: Invoke) throws {
+    let args = try invoke.parseArgs(SidecarArgs.self)
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        let contents = try self.withFolder(args.folderId) { root -> String? in
+          let url = try self.sidecarURL(root, args)
+          guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+          return try String(contentsOf: url, encoding: .utf8)
+        }
+        invoke.resolve(ReadSidecarResponse(contents: contents))
+      } catch {
+        invoke.reject(error.localizedDescription)
+      }
+    }
+  }
+
+  // `.atomic` writes a temp file and swaps it in, so sync tools never see a partial file.
+  @objc public func writeSidecar(_ invoke: Invoke) throws {
+    let args = try invoke.parseArgs(SidecarArgs.self)
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        try self.withFolder(args.folderId) { root in
+          let url = try self.sidecarURL(root, args)
+          try Data((args.contents ?? "").utf8).write(to: url, options: .atomic)
+        }
+        invoke.resolve()
+      } catch {
+        invoke.reject(error.localizedDescription)
+      }
+    }
+  }
+
+  /// Resolves a folder bookmark and runs `body` inside its security scope.
+  private func withFolder<T>(_ id: String, _ body: (URL) throws -> T) throws -> T {
+    var stale = false
+    guard let bookmark = Data(base64Encoded: id),
+      let root = try? URL(resolvingBookmarkData: bookmark, bookmarkDataIsStale: &stale)
+    else { throw LibraryError.lostAccess }
+
+    let accessing = root.startAccessingSecurityScopedResource()
+    defer { if accessing { root.stopAccessingSecurityScopedResource() } }
+    return try body(root)
+  }
+
+  private func sidecarURL(_ root: URL, _ args: SidecarArgs) throws -> URL {
+    let rootPath = root.standardizedFileURL.path
+    let dir = URL(fileURLWithPath: args.dir).standardizedFileURL
+    guard dir.path == rootPath || dir.path.hasPrefix(rootPath + "/") else {
+      throw LibraryError.outsideFolder
+    }
+    return dir.appendingPathComponent(args.sidecarName)
+  }
+
+  private func collectEbooks(_ root: URL) -> [Ebook] {
+    var books: [Ebook] = []
+    let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey]
+    // Unreadable subfolders are skipped rather than failing the whole scan.
+    let enumerator = FileManager.default.enumerator(
+      at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles],
+      errorHandler: { _, _ in true })
+    while let url = enumerator?.nextObject() as? URL {
+      let format = url.pathExtension.lowercased()
+      guard ebookExtensions.contains(format),
+        let values = try? url.resourceValues(forKeys: Set(keys)),
+        values.isRegularFile == true
+      else { continue }
+      books.append(
+        Ebook(
+          name: url.deletingPathExtension().lastPathComponent,
+          fileName: url.lastPathComponent,
+          path: url.path,
+          dir: url.deletingLastPathComponent().path,
+          format: format,
+          size: values.fileSize ?? 0))
+    }
+    return books
   }
 }
 

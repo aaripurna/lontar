@@ -1,4 +1,10 @@
-const COMMANDS: &[&str] = &["pick_folder", "release_folder", "scan"];
+const COMMANDS: &[&str] = &[
+    "pick_folder",
+    "release_folder",
+    "scan",
+    "read_sidecar",
+    "write_sidecar",
+];
 
 fn main() {
     tauri_plugin::Builder::new(COMMANDS)

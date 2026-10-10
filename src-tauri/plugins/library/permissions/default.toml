@@ -1,3 +1,9 @@
 [default]
-description = "Allows picking library folders and scanning them for ebooks."
-permissions = ["allow-pick-folder", "allow-release-folder", "allow-scan"]
+description = "Allows picking library folders, scanning them for ebooks, and reading and writing each book's .lontar sidecar."
+permissions = [
+  "allow-pick-folder",
+  "allow-release-folder",
+  "allow-scan",
+  "allow-read-sidecar",
+  "allow-write-sidecar",
+]

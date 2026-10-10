@@ -24,17 +24,28 @@ class FolderArgs {
   lateinit var id: String
 }
 
+@InvokeArg
+class SidecarArgs {
+  lateinit var folderId: String
+  // Parent document id of the book.
+  lateinit var dir: String
+  lateinit var sidecarName: String
+  var contents: String? = null
+}
+
+private const val READ_WRITE =
+  Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+
 // Folders are picked with the Storage Access Framework. The returned tree URI is the folder id;
-// its read permission is persisted so the library can be rescanned after the app restarts, and
-// released when the folder is removed from the library.
+// its read/write permission (write is for the .lontar sidecars) is persisted so the library can
+// be rescanned after the app restarts, and released when the folder is removed from the library.
 @TauriPlugin
 class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
 
   @Command
   fun pickFolder(invoke: Invoke) {
-    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
-      Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-    )
+    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+      .addFlags(READ_WRITE or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
     startActivityForResult(invoke, intent, "pickFolderResult")
   }
 
@@ -48,7 +59,7 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
     }
     try {
       val resolver = activity.contentResolver
-      resolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      resolver.takePersistableUriPermission(treeUri, READ_WRITE)
 
       val rootDocUri = DocumentsContract.buildDocumentUriUsingTree(
         treeUri, DocumentsContract.getTreeDocumentId(treeUri)
@@ -70,12 +81,14 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
   @Command
   fun releaseFolder(invoke: Invoke) {
     val args = invoke.parseArgs(FolderArgs::class.java)
-    try {
-      activity.contentResolver.releasePersistableUriPermission(
-        Uri.parse(args.id), Intent.FLAG_GRANT_READ_URI_PERMISSION
-      )
-    } catch (e: SecurityException) {
-      // Already released, e.g. the user revoked access in system settings.
+    val uri = Uri.parse(args.id)
+    val resolver = activity.contentResolver
+    // Release exactly what was granted: folders added by older builds only hold read access.
+    for (perm in resolver.persistedUriPermissions) {
+      if (perm.uri != uri) continue
+      val flags = (if (perm.isReadPermission) Intent.FLAG_GRANT_READ_URI_PERMISSION else 0) or
+        (if (perm.isWritePermission) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else 0)
+      resolver.releasePersistableUriPermission(uri, flags)
     }
     invoke.resolve()
   }
@@ -96,6 +109,74 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.reject(e.message ?: "Failed to scan folder")
       }
     }.start()
+  }
+
+  @Command
+  fun readSidecar(invoke: Invoke) {
+    val args = invoke.parseArgs(SidecarArgs::class.java)
+    Thread {
+      try {
+        val treeUri = Uri.parse(args.folderId)
+        val result = JSObject()
+        findChild(treeUri, args.dir, args.sidecarName)?.let { uri ->
+          activity.contentResolver.openInputStream(uri)?.use {
+            result.put("contents", it.readBytes().toString(Charsets.UTF_8))
+          }
+        }
+        invoke.resolve(result) // no sidecar yet: `contents` absent
+      } catch (e: SecurityException) {
+        invoke.reject("Lost access to this folder. Please add it again.")
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: "Failed to read ${args.sidecarName}")
+      }
+    }.start()
+  }
+
+  // SAF can't rename over an existing document, so unlike desktop this isn't an atomic swap:
+  // the existing sidecar is truncated and rewritten in place.
+  @Command
+  fun writeSidecar(invoke: Invoke) {
+    val args = invoke.parseArgs(SidecarArgs::class.java)
+    Thread {
+      try {
+        val treeUri = Uri.parse(args.folderId)
+        val resolver = activity.contentResolver
+        val uri = findChild(treeUri, args.dir, args.sidecarName)
+          ?: DocumentsContract.createDocument(
+            resolver,
+            DocumentsContract.buildDocumentUriUsingTree(treeUri, args.dir),
+            // A specific MIME type would make some providers append their own extension.
+            "application/octet-stream",
+            args.sidecarName
+          )
+          ?: throw Exception("Couldn't create ${args.sidecarName}")
+        val stream = resolver.openOutputStream(uri, "wt")
+          ?: throw Exception("Couldn't open ${args.sidecarName}")
+        stream.use { it.write((args.contents ?: "").toByteArray(Charsets.UTF_8)) }
+        invoke.resolve()
+      } catch (e: SecurityException) {
+        // Either the folder was added with read-only access (by an older build) or the book
+        // isn't inside it.
+        invoke.reject(
+          "Lontar isn't allowed to save here. Try removing the folder and adding it again."
+        )
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: "Failed to write ${args.sidecarName}")
+      }
+    }.start()
+  }
+
+  private fun findChild(treeUri: Uri, parentId: String, name: String): Uri? {
+    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
+    val columns = arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME)
+    activity.contentResolver.query(childrenUri, columns, null, null, null)?.use { cursor ->
+      while (cursor.moveToNext()) {
+        if (cursor.getString(1) == name) {
+          return DocumentsContract.buildDocumentUriUsingTree(treeUri, cursor.getString(0))
+        }
+      }
+    }
+    return null
   }
 
   private fun collectEbooks(treeUri: Uri, parentId: String, books: JSArray) {
@@ -124,7 +205,9 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
 
         val book = JSObject()
         book.put("name", name.substring(0, dot))
+        book.put("fileName", name)
         book.put("path", DocumentsContract.buildDocumentUriUsingTree(treeUri, docId).toString())
+        book.put("dir", parentId)
         book.put("format", format)
         book.put("size", if (cursor.isNull(3)) 0L else cursor.getLong(3))
         books.put(book)

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-write-sidecar"
+description = "Enables the write_sidecar command without any pre-configured scope."
+commands.allow = ["write_sidecar"]
+
+[[permission]]
+identifier = "deny-write-sidecar"
+description = "Denies the write_sidecar command without any pre-configured scope."
+commands.deny = ["write_sidecar"]

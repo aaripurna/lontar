@@ -36,13 +36,50 @@ pub struct Folder {
     pub name: String,
 }
 
+/// Reading progress, bookmarks and annotations live in a sidecar next to each book, named
+/// `<file name>.lontar` (e.g. `Dune.epub.lontar`), so syncing the library folder (e.g. with
+/// Syncthing) carries them across devices.
+pub const SIDECAR_EXTENSION: &str = "lontar";
+
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Ebook {
+    /// File name without the extension, for display.
     pub name: String,
+    /// Full file name, e.g. `Dune.epub`.
+    pub file_name: String,
     /// Path on desktop and iOS, document URI on Android.
     pub path: String,
+    /// Where the book sits, to locate its sidecar: the parent directory path on desktop and
+    /// iOS, the parent document id on Android.
+    pub dir: String,
+    /// The library folder this book was found in. Filled in by `scan`.
+    #[serde(default)]
+    pub folder_id: String,
     pub format: String,
     pub size: u64,
+}
+
+/// Identifies a book's sidecar. Mirrors the fields of [`Ebook`] that locate it.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SidecarRef {
+    pub folder_id: String,
+    pub dir: String,
+    pub file_name: String,
+}
+
+impl SidecarRef {
+    pub fn sidecar_name(&self) -> Result<String, String> {
+        // Never let a crafted name escape the book's directory.
+        if self.file_name.is_empty()
+            || self.file_name.contains(['/', '\\'])
+            || self.file_name == ".."
+        {
+            return Err(format!("Invalid book file name: {}", self.file_name));
+        }
+        Ok(format!("{}.{SIDECAR_EXTENSION}", self.file_name))
+    }
 }
 
 #[derive(Serialize)]
@@ -80,7 +117,10 @@ async fn scan<R: Runtime>(app: tauri::AppHandle<R>, ids: Vec<String>) -> Result<
         let mut errors = Vec::new();
         for id in ids {
             match library.scan(&id) {
-                Ok(found) => books.extend(found),
+                Ok(found) => books.extend(found.into_iter().map(|mut b| {
+                    b.folder_id = id.clone();
+                    b
+                })),
                 Err(message) => errors.push(ScanError {
                     folder_id: id,
                     message,
@@ -97,9 +137,40 @@ async fn scan<R: Runtime>(app: tauri::AppHandle<R>, ids: Vec<String>) -> Result<
     .map_err(|e| e.to_string())
 }
 
+/// Returns the book's sidecar contents, or `None` if it has none yet.
+#[tauri::command]
+async fn read_sidecar<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    book: SidecarRef,
+) -> Result<Option<String>, String> {
+    let library = app.state::<Library<R>>().inner().clone();
+    tauri::async_runtime::spawn_blocking(move || library.read_sidecar(&book))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Creates or replaces the book's sidecar.
+#[tauri::command]
+async fn write_sidecar<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    book: SidecarRef,
+    contents: String,
+) -> Result<(), String> {
+    let library = app.state::<Library<R>>().inner().clone();
+    tauri::async_runtime::spawn_blocking(move || library.write_sidecar(&book, &contents))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("library")
-        .invoke_handler(tauri::generate_handler![pick_folder, release_folder, scan])
+        .invoke_handler(tauri::generate_handler![
+            pick_folder,
+            release_folder,
+            scan,
+            read_sidecar,
+            write_sidecar
+        ])
         .setup(|app, api| {
             #[cfg(desktop)]
             let library = desktop::init(app, api);
