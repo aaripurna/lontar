@@ -24,8 +24,8 @@ modules:
       - ar -x lontar.deb --output deb-extract
       - tar -C deb-extract -xf deb-extract/data.tar.gz
       - install -Dm755 deb-extract/usr/bin/lontar /app/bin/lontar
-      - sed -i 's/^Icon=.*/Icon=com.nawa.lontar/' deb-extract/usr/share/applications/lontar.desktop
-      - install -Dm644 deb-extract/usr/share/applications/lontar.desktop /app/share/applications/com.nawa.lontar.desktop
+      - sed -i 's/^Icon=.*/Icon=com.nawa.lontar/' deb-extract/usr/share/applications/Lontar.desktop
+      - install -Dm644 deb-extract/usr/share/applications/Lontar.desktop /app/share/applications/com.nawa.lontar.desktop
       - install -Dm644 deb-extract/usr/share/icons/hicolor/32x32/apps/lontar.png /app/share/icons/hicolor/32x32/apps/com.nawa.lontar.png
       - install -Dm644 deb-extract/usr/share/icons/hicolor/128x128/apps/lontar.png /app/share/icons/hicolor/128x128/apps/com.nawa.lontar.png
       - install -Dm644 deb-extract/usr/share/icons/hicolor/256x256@2/apps/lontar.png /app/share/icons/hicolor/256x256@2/apps/com.nawa.lontar.png

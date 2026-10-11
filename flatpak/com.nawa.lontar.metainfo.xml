@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>com.nawa.lontar</id>
   <launchable type="desktop-id">com.nawa.lontar.desktop</launchable>
-  <name>lontar</name>
+  <name>Lontar</name>
   <summary>TODO: one-line summary</summary>
   <developer id="com.nawa">
     <name>nawa</name>

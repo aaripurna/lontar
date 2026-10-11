@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "lontar",
+  "productName": "Lontar",
   "version": "0.1.0",
   "identifier": "com.nawa.lontar",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "lontar",
+        "title": "Lontar",
         "width": 1000,
         "height": 700,
         "minWidth": 360,
