@@ -30,6 +30,13 @@ struct Ebook: Encodable {
   let sidecar: String?
 }
 
+// A sidecar whose book is gone (renamed or moved), which the frontend may reattach.
+struct OrphanSidecar: Encodable {
+  let dir: String
+  let fileName: String
+  let contents: String
+}
+
 struct BookArgs: Decodable {
   let folderId: String
   let path: String
@@ -80,6 +87,7 @@ enum LibraryError: LocalizedError {
 
 struct ScanResponse: Encodable {
   let books: [Ebook]
+  let orphans: [OrphanSidecar]
 }
 
 // Folders come from the document picker and are only readable inside a security scope, and
@@ -135,8 +143,8 @@ class LibraryPlugin: Plugin, UIDocumentPickerDelegate {
     let args = try invoke.parseArgs(FolderArgs.self)
     DispatchQueue.global(qos: .userInitiated).async {
       do {
-        let books = try self.withFolder(args.id) { root in self.collectEbooks(root) }
-        invoke.resolve(ScanResponse(books: books))
+        let (books, orphans) = try self.withFolder(args.id) { root in self.collectEbooks(root) }
+        invoke.resolve(ScanResponse(books: books, orphans: orphans))
       } catch {
         invoke.reject(error.localizedDescription)
       }
@@ -257,14 +265,30 @@ class LibraryPlugin: Plugin, UIDocumentPickerDelegate {
     return dir.appendingPathComponent(args.sidecarName)
   }
 
-  private func collectEbooks(_ root: URL) -> [Ebook] {
+  private func collectEbooks(_ root: URL) -> ([Ebook], [OrphanSidecar]) {
     var books: [Ebook] = []
+    var orphans: [OrphanSidecar] = []
     let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey]
     // Unreadable subfolders are skipped rather than failing the whole scan.
     let enumerator = FileManager.default.enumerator(
       at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles],
       errorHandler: { _, _ in true })
     while let url = enumerator?.nextObject() as? URL {
+      if url.pathExtension == "lontar" {
+        // A sidecar (not a conflict copy) whose book is no longer next to it.
+        let book = url.deletingPathExtension()
+        if !book.lastPathComponent.contains(".sync-conflict-"),
+          ebookExtensions.contains(book.pathExtension.lowercased()),
+          !FileManager.default.fileExists(atPath: book.path),
+          let contents = try? String(contentsOf: url, encoding: .utf8)
+        {
+          orphans.append(
+            OrphanSidecar(
+              dir: url.deletingLastPathComponent().path, fileName: book.lastPathComponent,
+              contents: contents))
+        }
+        continue
+      }
       let format = url.pathExtension.lowercased()
       guard ebookExtensions.contains(format),
         let values = try? url.resourceValues(forKeys: Set(keys)),
@@ -282,7 +306,7 @@ class LibraryPlugin: Plugin, UIDocumentPickerDelegate {
           sidecar: try? String(
             contentsOf: url.appendingPathExtension("lontar"), encoding: .utf8)))
     }
-    return books
+    return (books, orphans)
   }
 }
 

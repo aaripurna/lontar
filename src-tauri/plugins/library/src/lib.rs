@@ -113,6 +113,39 @@ impl SidecarRef {
     }
 }
 
+/// A sidecar with no book next to it any more, e.g. because the book was renamed or moved. The
+/// frontend may reattach it to the book it belongs to (by the `bookId` inside it).
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrphanSidecar {
+    /// Where it is, as for a book: its directory, and the file name of the book it was for.
+    pub dir: String,
+    pub file_name: String,
+    /// The library folder it was found in. Filled in by `scan`.
+    #[serde(default)]
+    pub folder_id: String,
+    pub contents: String,
+}
+
+/// What scanning one library folder finds.
+#[derive(Debug, Default, Deserialize)]
+pub struct FolderScan {
+    pub books: Vec<Ebook>,
+    #[serde(default)]
+    pub orphans: Vec<OrphanSidecar>,
+}
+
+/// For a file named like a sidecar of an ebook (`Dune.epub.lontar`), the book's file name.
+/// Conflict copies and hidden files aren't sidecars.
+pub fn sidecar_book_name(name: &str) -> Option<&str> {
+    let book = name.strip_suffix(&format!(".{SIDECAR_EXTENSION}"))?;
+    if book.starts_with('.') || book.contains(".sync-conflict-") {
+        return None;
+    }
+    let ext = book.rsplit_once('.')?.1.to_ascii_lowercase();
+    EBOOK_EXTENSIONS.contains(&ext.as_str()).then_some(book)
+}
+
 /// A sidecar conflict copy left by a sync tool.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SidecarFile {
@@ -130,6 +163,7 @@ struct ScanError {
 #[derive(Serialize)]
 struct ScanResult {
     books: Vec<Ebook>,
+    orphans: Vec<OrphanSidecar>,
     /// Folders that couldn't be read, e.g. because access was revoked. The rest still scan.
     errors: Vec<ScanError>,
 }
@@ -152,13 +186,20 @@ async fn scan<R: Runtime>(app: tauri::AppHandle<R>, ids: Vec<String>) -> Result<
     let library = app.state::<Library<R>>().inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let mut books = Vec::new();
+        let mut orphans = Vec::new();
         let mut errors = Vec::new();
         for id in ids {
             match library.scan(&id) {
-                Ok(found) => books.extend(found.into_iter().map(|mut b| {
-                    b.folder_id = id.clone();
-                    b
-                })),
+                Ok(found) => {
+                    books.extend(found.books.into_iter().map(|mut b| {
+                        b.folder_id = id.clone();
+                        b
+                    }));
+                    orphans.extend(found.orphans.into_iter().map(|mut o| {
+                        o.folder_id = id.clone();
+                        o
+                    }));
+                }
                 Err(message) => errors.push(ScanError {
                     folder_id: id,
                     message,
@@ -169,7 +210,13 @@ async fn scan<R: Runtime>(app: tauri::AppHandle<R>, ids: Vec<String>) -> Result<
         let mut seen = HashSet::new();
         books.retain(|b| seen.insert(b.path.clone()));
         books.sort_by_key(|b| b.name.to_lowercase());
-        ScanResult { books, errors }
+        let mut seen = HashSet::new();
+        orphans.retain(|o| seen.insert((o.dir.clone(), o.file_name.clone())));
+        ScanResult {
+            books,
+            orphans,
+            errors,
+        }
     })
     .await
     .map_err(|e| e.to_string())
@@ -252,6 +299,16 @@ async fn delete_sidecar_conflict<R: Runtime>(
         .map_err(|e| e.to_string())?
 }
 
+/// Deletes the book's sidecar: an orphan, once it has been copied to the book it belongs to.
+#[tauri::command]
+async fn delete_sidecar<R: Runtime>(app: tauri::AppHandle<R>, book: SidecarRef) -> Result<(), String> {
+    let name = book.sidecar_name()?;
+    let library = app.state::<Library<R>>().inner().clone();
+    tauri::async_runtime::spawn_blocking(move || library.delete_sidecar_file(&book, &name))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Colours the area behind the system status and navigation bars, and picks light or dark
 /// icons for them. Only Android needs this; elsewhere the app draws behind the bars itself.
 #[tauri::command]
@@ -280,6 +337,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             write_sidecar,
             read_sidecar_conflicts,
             delete_sidecar_conflict,
+            delete_sidecar,
             set_bar_colors
         ])
         .setup(|app, api| {

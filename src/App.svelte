@@ -5,7 +5,8 @@
   import Cover from "./Cover.svelte";
   import { getBookMeta, pauseBackground, pruneCovers } from "./lib/covers.js";
   import { displayTitle, filterBooks, sortBooks } from "./lib/library.js";
-  import { scannedProgress } from "./lib/sidecar.js";
+  import { reattachSidecar, saveBookData, scannedProgress } from "./lib/sidecar.js";
+  import { computeBookId, matchOrphans, reattachCandidates } from "./lib/bookid.js";
   import { setBarColors } from "./lib/bars.js";
 
   const FOLDERS_KEY = "lontar.libraryFolders";
@@ -102,11 +103,65 @@
       // With a folder missing, its covers would be dropped and remade later, so wait.
       if (!result.errors.length) pruneCovers(books).catch((e) => console.warn(e));
       loadBookInfo(books);
+      reattachOrphans(result.orphans, result.books).then(() => stampBookIds(result.books));
       folderErrors = Object.fromEntries(result.errors.map((e) => [e.folderId, e.message]));
     } catch (e) {
       error = String(e);
     } finally {
       loading = false;
+    }
+  }
+
+  // Gives renamed or moved books back their sidecar: an orphaned sidecar whose bookId matches
+  // a book without one is renamed to suit it. Only books of the right size are read.
+  async function reattachOrphans(orphans, scanned) {
+    const candidates = reattachCandidates(orphans, scanned, (book) => book.sidecar != null);
+    if (!candidates.length) return;
+    const ids = new Map();
+    for (const book of candidates) {
+      try {
+        const bytes = await invoke("plugin:library|read_book", {
+          book: { folderId: book.folderId, path: book.path },
+        });
+        ids.set(book.path, await computeBookId(bytes));
+      } catch (e) {
+        console.warn(`Couldn't read ${book.fileName}`, e);
+      }
+    }
+    for (const { orphan, book } of matchOrphans(orphans, candidates, (b) => ids.get(b.path))) {
+      try {
+        await reattachSidecar(orphan, book);
+        const restored = scannedProgress({ ...book, sidecar: orphan.contents });
+        if (restored) progress[book.path] = restored;
+      } catch (e) {
+        console.warn(`Couldn't move ${orphan.fileName}.lontar to ${book.fileName}`, e);
+      }
+    }
+  }
+
+  // Sidecars from before bookId (or for books never opened since) get one in the background,
+  // so a rename can't orphan them. Paused while reading; each book is done once.
+  const stamping = new Set();
+  async function stampBookIds(scanned) {
+    for (const book of scanned) {
+      if (!book.sidecar || stamping.has(book.path)) continue;
+      try {
+        if (JSON.parse(book.sidecar)?.bookId) continue;
+      } catch {
+        continue; // unreadable; opening the book deals with it
+      }
+      stamping.add(book.path);
+      while (reading) await new Promise((resolve) => setTimeout(resolve, 2000));
+      try {
+        const bytes = await invoke("plugin:library|read_book", {
+          book: { folderId: book.folderId, path: book.path },
+        });
+        const bookId = await computeBookId(bytes);
+        // Merged with the sidecar on disk, so nothing else in it changes.
+        if (bookId) await saveBookData(book, { bookId });
+      } catch (e) {
+        console.warn(`Couldn't record the id of ${book.fileName}`, e);
+      }
     }
   }
 

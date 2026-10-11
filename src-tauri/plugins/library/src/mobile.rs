@@ -4,7 +4,7 @@ use tauri::{
     AppHandle, Runtime,
 };
 
-use crate::{BookRef, Ebook, Folder, SidecarFile, SidecarRef};
+use crate::{BookRef, Folder, FolderScan, SidecarFile, SidecarRef};
 
 #[cfg(target_os = "ios")]
 tauri::ios_plugin_binding!(init_plugin_library);
@@ -36,11 +36,6 @@ struct PickFolderResponse {
 #[derive(Serialize)]
 struct FolderArgs<'a> {
     id: &'a str,
-}
-
-#[derive(Deserialize)]
-struct ScanResponse {
-    books: Vec<Ebook>,
 }
 
 #[derive(Serialize)]
@@ -103,10 +98,9 @@ impl<R: Runtime> Library<R> {
             .map_err(|e| e.to_string())
     }
 
-    pub fn scan(&self, id: &str) -> Result<Vec<Ebook>, String> {
+    pub fn scan(&self, id: &str) -> Result<FolderScan, String> {
         self.0
-            .run_mobile_plugin::<ScanResponse>("scan", FolderArgs { id })
-            .map(|r| r.books)
+            .run_mobile_plugin::<FolderScan>("scan", FolderArgs { id })
             .map_err(|e| e.to_string())
     }
 

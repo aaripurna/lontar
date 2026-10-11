@@ -4,6 +4,7 @@
   import "foliate-js/view.js";
   import { Overlayer } from "foliate-js/overlayer.js";
   import { loadBookData, mergeBookData, saveBookData } from "./lib/sidecar.js";
+  import { computeBookId } from "./lib/bookid.js";
   import { activeItems, isOnPage, makeBookmark, removeItems } from "./lib/bookmarks.js";
   import { HIGHLIGHT_COLORS, highlightColor, makeHighlight, updateItem } from "./lib/annotations.js";
   import { setBarColors } from "./lib/bars.js";
@@ -546,6 +547,13 @@
     savedLocation = view.lastLocation?.cfi ?? lastLocation ?? null;
     ready = true;
     canBookmark = !!bookData;
+
+    // Record what the book is, so its sidecar can find it again if it's renamed or moved.
+    const bookId = await computeBookId(bytes).catch(() => null);
+    if (bookData && bookId && bookData.bookId !== bookId) {
+      bookData.bookId = bookId;
+      persist();
+    }
   }
 
   // The system back button (Android) and the header's back button both pop this entry.

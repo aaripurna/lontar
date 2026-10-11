@@ -127,8 +127,9 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
       try {
         val treeUri = Uri.parse(args.id)
         val books = JSArray()
-        collectEbooks(treeUri, DocumentsContract.getTreeDocumentId(treeUri), books)
-        invoke.resolve(JSObject().put("books", books))
+        val orphans = JSArray()
+        collectEbooks(treeUri, DocumentsContract.getTreeDocumentId(treeUri), books, orphans)
+        invoke.resolve(JSObject().put("books", books).put("orphans", orphans))
       } catch (e: SecurityException) {
         invoke.reject("Lost access to this folder. Please choose it again.")
       } catch (e: Exception) {
@@ -294,7 +295,9 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
     return null
   }
 
-  private fun collectEbooks(treeUri: Uri, parentId: String, books: JSArray) {
+  // Lists the ebooks under `parentId` into `books`, and into `orphans` the sidecars whose book
+  // is gone (renamed or moved), which the frontend may reattach.
+  private fun collectEbooks(treeUri: Uri, parentId: String, books: JSArray, orphans: JSArray) {
     val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
     val columns = arrayOf(
       Document.COLUMN_DOCUMENT_ID,
@@ -334,22 +337,30 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
         found.add(book)
       }
     }
+    fun readText(docId: String): String? = try {
+      val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+      activity.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+    } catch (e: Exception) {
+      null // leave it out; opening the book reports the problem
+    }
     // Attach each book's sidecar, so the library can show progress without a read per book.
     for (book in found) {
-      sidecars[book.getString("fileName") + SIDECAR_SUFFIX]?.let { docId ->
-        try {
-          val uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-          activity.contentResolver.openInputStream(uri)?.use {
-            book.put("sidecar", it.readBytes().toString(Charsets.UTF_8))
-          }
-        } catch (e: Exception) {
-          // Leave it out; opening the book reports the problem.
-        }
+      sidecars.remove(book.getString("fileName") + SIDECAR_SUFFIX)?.let { docId ->
+        readText(docId)?.let { book.put("sidecar", it) }
       }
       books.put(book)
     }
+    // What's left are sidecars without their book. Conflict copies aren't sidecars.
+    for ((name, docId) in sidecars) {
+      val bookName = name.removeSuffix(SIDECAR_SUFFIX)
+      if (bookName.contains(".sync-conflict-")) continue
+      val format = bookName.substringAfterLast('.', "").lowercase()
+      if (format !in EBOOK_EXTENSIONS) continue
+      val contents = readText(docId) ?: continue
+      orphans.put(JSObject().put("dir", parentId).put("fileName", bookName).put("contents", contents))
+    }
     for (dir in subdirs) {
-      collectEbooks(treeUri, dir, books)
+      collectEbooks(treeUri, dir, books, orphans)
     }
   }
 }

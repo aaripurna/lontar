@@ -6,7 +6,10 @@ use serde::de::DeserializeOwned;
 use tauri::{plugin::PluginApi, AppHandle, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::{BookRef, Ebook, Folder, SidecarFile, SidecarRef, EBOOK_EXTENSIONS, SIDECAR_EXTENSION};
+use crate::{
+    sidecar_book_name, BookRef, Ebook, Folder, FolderScan, OrphanSidecar, SidecarFile, SidecarRef,
+    EBOOK_EXTENSIONS, SIDECAR_EXTENSION,
+};
 
 pub fn init<R: Runtime, C: DeserializeOwned>(app: &AppHandle<R>, _api: PluginApi<R, C>) -> Library<R> {
     Library(app.clone())
@@ -38,14 +41,14 @@ impl<R: Runtime> Library<R> {
         Ok(())
     }
 
-    pub fn scan(&self, id: &str) -> Result<Vec<Ebook>, String> {
+    pub fn scan(&self, id: &str) -> Result<FolderScan, String> {
         let root = Path::new(id);
         if !root.is_dir() {
             return Err(format!("Not a directory: {id}"));
         }
-        let mut books = Vec::new();
-        collect_ebooks(root, &mut books);
-        Ok(books)
+        let mut found = FolderScan::default();
+        collect_ebooks(root, &mut found);
+        Ok(found)
     }
 
     pub fn read_book(&self, book: &BookRef) -> Result<Vec<u8>, String> {
@@ -139,7 +142,7 @@ fn ebook_format(path: &Path) -> Option<String> {
 
 // Recurses into subdirectories, skipping hidden entries and symlinks (which could loop).
 // Unreadable subdirectories are skipped so one bad folder doesn't fail the whole scan.
-fn collect_ebooks(dir: &Path, books: &mut Vec<Ebook>) {
+fn collect_ebooks(dir: &Path, found: &mut FolderScan) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
@@ -152,12 +155,24 @@ fn collect_ebooks(dir: &Path, books: &mut Vec<Ebook>) {
         };
         let path = entry.path();
         if file_type.is_dir() {
-            collect_ebooks(&path, books);
+            collect_ebooks(&path, found);
         } else if file_type.is_file() {
-            if let Some(format) = ebook_format(&path) {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if let Some(book_name) = sidecar_book_name(&name) {
+                if !dir.join(book_name).exists() {
+                    if let Ok(contents) = fs::read_to_string(&path) {
+                        found.orphans.push(OrphanSidecar {
+                            dir: dir.to_string_lossy().into_owned(),
+                            file_name: book_name.to_owned(),
+                            folder_id: String::new(),
+                            contents,
+                        });
+                    }
+                }
+            } else if let Some(format) = ebook_format(&path) {
                 let file_name = entry.file_name().to_string_lossy().into_owned();
                 let sidecar = path.with_file_name(format!("{file_name}.{SIDECAR_EXTENSION}"));
-                books.push(Ebook {
+                found.books.push(Ebook {
                     name: path
                         .file_stem()
                         .map(|s| s.to_string_lossy().into_owned())
@@ -235,11 +250,18 @@ mod tests {
         fs::write(library.join("Dune.epub.lontar"), r#"{"version":1}"#).unwrap();
         fs::write(library.join("Fiction/Emma.epub"), "x").unwrap();
 
-        let mut books = Vec::new();
-        collect_ebooks(&library, &mut books);
+        fs::write(library.join("Fiction/Old Title.epub.lontar"), r#"{"bookId":"x"}"#).unwrap();
+        fs::write(library.join("Fiction/Emma.epub.sync-conflict-20261010-192000-ABC1234.lontar"), "{}").unwrap();
+
+        let mut found = FolderScan::default();
+        collect_ebooks(&library, &mut found);
+        let mut books = found.books;
         books.sort_by(|a, b| a.name.cmp(&b.name));
         let sidecars: Vec<_> = books.iter().map(|b| (b.name.as_str(), b.sidecar.as_deref())).collect();
         assert_eq!(sidecars, [("Dune", Some(r#"{"version":1}"#)), ("Emma", None)]);
+        // Only the sidecar whose book is gone is an orphan; conflict copies aren't sidecars.
+        let orphans: Vec<_> = found.orphans.iter().map(|o| (o.file_name.as_str(), o.contents.as_str())).collect();
+        assert_eq!(orphans, [("Old Title.epub", r#"{"bookId":"x"}"#)]);
 
         fs::remove_dir_all(&library).unwrap();
     }

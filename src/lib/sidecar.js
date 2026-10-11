@@ -5,6 +5,7 @@
 // Format (version 1):
 //   {
 //     "version": 1,
+//     "bookId": "v1:<size>:<sha-256>",  (see bookid.js; finds the book again after a rename)
 //     "progress": { "location": "epubcfi(...)", "fraction": 0.42, "updatedAt": "<ISO 8601>" },
 //     "bookmarks":   [{ "id", "createdAt", "updatedAt"?, "deleted"?, ... }],
 //     "annotations": [{ "id", "createdAt", "updatedAt"?, "deleted"?, ... }]
@@ -111,4 +112,16 @@ export async function saveBookData(book, data) {
   const merged = mergeBookData(data, contents == null ? null : parse(contents, book.fileName + ".lontar"));
   await write(book, merged);
   return merged;
+}
+
+/**
+ * Moves an orphaned sidecar (`plugin:library|scan`'s `orphans`) to the book it belongs to,
+ * renamed to suit it. It's copied first and the orphan deleted after, so a failure halfway
+ * leaves a copy rather than nothing.
+ */
+export async function reattachSidecar(orphan, book) {
+  await invoke("plugin:library|write_sidecar", { book: sidecarRef(book), contents: orphan.contents });
+  await invoke("plugin:library|delete_sidecar", {
+    book: { folderId: orphan.folderId, dir: orphan.dir, fileName: orphan.fileName },
+  });
 }

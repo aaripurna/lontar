@@ -7,6 +7,7 @@ const COMMANDS: &[&str] = &[
     "write_sidecar",
     "read_sidecar_conflicts",
     "delete_sidecar_conflict",
+    "delete_sidecar",
     "set_bar_colors",
 ];
 
