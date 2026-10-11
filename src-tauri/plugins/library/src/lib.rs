@@ -351,6 +351,18 @@ fn take_opened_books<R: Runtime>(app: AppHandle<R>) -> Result<Vec<Ebook>, String
     app.state::<Library<R>>().take_opened_books()
 }
 
+/// Lets the Android launch screen go, once the frontend has drawn. A no-op elsewhere.
+#[tauri::command]
+fn hide_splash<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    #[cfg(desktop)]
+    return {
+        let _ = app;
+        Ok(())
+    };
+    #[cfg(mobile)]
+    app.state::<Library<R>>().hide_splash()
+}
+
 /// Sends the app to the background, as Android's Back does at an app's root. The frontend
 /// handles Back itself, so it calls this when there's nothing left to go back to. Android only.
 #[tauri::command]
@@ -395,7 +407,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             delete_sidecar,
             set_bar_colors,
             take_opened_books,
-            move_to_background
+            move_to_background,
+            hide_splash
         ])
         .setup(|app, api| {
             #[cfg(desktop)]

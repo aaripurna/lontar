@@ -90,6 +90,21 @@ private const val READ_WRITE =
 @TauriPlugin
 class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
 
+  companion object {
+    // Set once the frontend has drawn; MainActivity keeps the launch screen up until then.
+    @Volatile
+    @JvmStatic
+    var pageReady = false
+  }
+
+  @Command
+  fun hideSplash(invoke: Invoke) {
+    pageReady = true
+    // The launch screen checks again on the next frame; make sure there is one.
+    activity.runOnUiThread { activity.window.decorView.invalidate() }
+    invoke.resolve()
+  }
+
   // Books opened from other apps ("Open with"), waiting for the frontend to take them.
   private val openedBooks = mutableListOf<JSObject>()
   // Documents other apps have let us read by opening them here. The grant lasts as long as

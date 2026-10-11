@@ -16,6 +16,7 @@ Allows picking library folders, scanning them for ebooks, opening books, and rea
 - `allow-set-bar-colors`
 - `allow-take-opened-books`
 - `allow-move-to-background`
+- `allow-hide-splash`
 
 ## Permission Table
 
@@ -74,6 +75,32 @@ Enables the delete_sidecar_conflict command without any pre-configured scope.
 <td>
 
 Denies the delete_sidecar_conflict command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:allow-hide-splash`
+
+</td>
+<td>
+
+Enables the hide_splash command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:deny-hide-splash`
+
+</td>
+<td>
+
+Denies the hide_splash command without any pre-configured scope.
 
 </td>
 </tr>

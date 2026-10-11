@@ -250,6 +250,10 @@
   }
 
   onMount(() => {
+    // The library is on screen after the next frame; Android's launch screen can go.
+    requestAnimationFrame(() =>
+      invoke("plugin:library|hide_splash").catch((e) => console.warn("Couldn't hide the launch screen", e)),
+    );
     firstScan = refresh();
     // Listen first, then take what arrived before, so no opened book is missed. Android has no
     // event; a book sent from another app brings lontar back to the foreground instead.

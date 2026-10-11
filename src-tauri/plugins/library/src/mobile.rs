@@ -180,6 +180,15 @@ impl<R: Runtime> Library<R> {
             .map_err(|e| e.to_string())
     }
 
+    pub fn hide_splash(&self) -> Result<(), String> {
+        if cfg!(target_os = "ios") {
+            return Ok(()); // iOS shows its launch screen by itself
+        }
+        self.0
+            .run_mobile_plugin::<()>("hideSplash", ())
+            .map_err(|e| e.to_string())
+    }
+
     pub fn move_to_background(&self) -> Result<(), String> {
         if cfg!(target_os = "ios") {
             return Ok(()); // iOS has no Back button

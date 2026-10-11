@@ -13,4 +13,5 @@ permissions = [
   "allow-set-bar-colors",
   "allow-take-opened-books",
   "allow-move-to-background",
+  "allow-hide-splash",
 ]

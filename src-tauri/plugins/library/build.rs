@@ -11,6 +11,7 @@ const COMMANDS: &[&str] = &[
     "set_bar_colors",
     "take_opened_books",
     "move_to_background",
+    "hide_splash",
 ];
 
 fn main() {

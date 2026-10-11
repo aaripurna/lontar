@@ -3,4 +3,14 @@
     <style name="Theme.lontar" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
     </style>
+
+    <!-- The launch screen: shown from launch until the library has drawn (see MainActivity), so
+         the web view's blank page while it loads is never seen. The background matches the
+         library's in app.css. -->
+    <style name="Theme.lontar.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/ic_launcher_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.lontar</item>
+    </style>
 </resources>
