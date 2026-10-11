@@ -609,6 +609,9 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z" /></svg>
       </button>
     {/if}
+    <button class="bar-icon" aria-label="Reading settings" title="Reading settings" onclick={() => openPanel("controls")}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></svg>
+    </button>
   </header>
 
   <div class="reader-page" bind:this={container}>
@@ -616,6 +619,15 @@
       <p class="status">Opening…</p>
     {:else if error}
       <p class="error">{error}</p>
+    {:else}
+      <!-- shown only with a mouse; see .page-turn in app.css. They don't take focus, so Space
+           keeps turning forward after one is clicked. -->
+      <button class="page-turn left" aria-label="Previous page" onmousedown={(e) => e.preventDefault()} onclick={() => view?.goLeft()}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+      </button>
+      <button class="page-turn right" aria-label="Next page" onmousedown={(e) => e.preventDefault()} onclick={() => view?.goRight()}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+      </button>
     {/if}
   </div>
 

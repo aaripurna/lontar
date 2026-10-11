@@ -405,6 +405,50 @@ button {
   filter: invert(0.89) hue-rotate(180deg);
 }
 
+/* Page-turn arrows at the edges of the page, for mouse users. Touch screens swipe instead. */
+.reader .page-turn {
+  display: none;
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  transform: translateY(-50%);
+  padding: 1.5em 0.5em;
+  border: none;
+  border-radius: 8px;
+  opacity: 0.35;
+  transition: opacity 0.2s, background-color 0.2s;
+}
+
+.reader .page-turn.left {
+  left: 0.25em;
+}
+
+.reader .page-turn.right {
+  right: 0.25em;
+}
+
+.reader .page-turn:hover {
+  opacity: 0.9;
+  background-color: var(--reader-chrome);
+}
+
+.page-turn svg {
+  display: block;
+  width: 1.5em;
+  height: 1.5em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .reader .page-turn {
+    display: block;
+  }
+}
+
 .reader-page .status,
 .reader-page .error {
   text-align: center;
@@ -724,6 +768,58 @@ button {
   color: var(--reader-fg);
   font: inherit;
   resize: vertical;
+}
+
+/* Wide windows (desktop, tablets, landscape phones). Width alone decides, so a narrow desktop
+   window gets the phone layout. */
+@media (min-width: 720px) {
+  .container {
+    box-sizing: border-box;
+    max-width: 72rem;
+    margin: 0 auto;
+  }
+
+  .books {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+    column-gap: 2em;
+  }
+
+  /* Short sheets float as a card in the middle of the window instead of spanning it. */
+  .reader-sheet {
+    top: 50%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    box-sizing: border-box;
+    width: min(32rem, calc(100% - 2em));
+    padding-bottom: 1em;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  }
+
+  /* Lists (contents, bookmarks, highlights, search) open as a drawer on the right, full height. */
+  .reader-sheet.reader-toc {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    transform: none;
+    width: min(24rem, 100%);
+    max-height: none;
+    padding: calc(1em + env(safe-area-inset-top)) calc(1em + env(safe-area-inset-right))
+      calc(1em + env(safe-area-inset-bottom)) 1em;
+    border-radius: 0;
+    box-shadow: -2px 0 12px rgba(0, 0, 0, 0.2);
+  }
+
+  /* the sticky search box sits flush with the drawer's top padding */
+  .reader-search form {
+    top: calc(-1em - env(safe-area-inset-top));
+    margin-top: calc(-1em - env(safe-area-inset-top));
+    padding-top: calc(1em + env(safe-area-inset-top));
+  }
 }
 
 @media (prefers-color-scheme: dark) {
