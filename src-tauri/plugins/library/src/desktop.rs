@@ -142,9 +142,10 @@ fn ebook_format(path: &Path) -> Option<String> {
 
 /// A book file the OS asked us to open, described like a scanned one. Its own directory stands
 /// in for the library folder, so its sidecar is read and written next to it as usual. `None`
-/// if it isn't an ebook file.
+/// if it isn't an ebook file. On Windows, `dunce` keeps the plain `C:\...` form instead of
+/// `\\?\C:\...`, so the path still matches the same book found by a library scan.
 pub fn opened_book(path: &Path) -> Option<Ebook> {
-    let path = fs::canonicalize(path).ok()?;
+    let path = dunce::canonicalize(path).ok()?;
     let metadata = fs::metadata(&path).ok()?;
     let format = ebook_format(&path).filter(|_| metadata.is_file())?;
     let dir = path.parent()?.to_string_lossy().into_owned();

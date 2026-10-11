@@ -107,6 +107,35 @@ jobs:
         with:
           files: lontar-${{ github.ref_name }}-macos-universal.dmg
 
+  windows-installer:
+    # Unsigned NSIS setup .exe. It installs per user (no admin needed) and fetches WebView2 if
+    # it's missing. Without a code-signing certificate SmartScreen warns on first run.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build installer
+        run: bun run tauri build --bundles nsis
+
+      - name: Collect installer
+        shell: bash
+        run: cp src-tauri/target/release/bundle/nsis/*-setup.exe "lontar-${GITHUB_REF_NAME}-windows-x64-setup.exe"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: lontar-${{ github.ref_name }}-windows-x64-setup.exe
+
   ios-ipa:
     # Unsigned .ipa for sideloading (AltStore / SideStore / Sideloadly re-sign it with the user's Apple ID).
     runs-on: macos-latest

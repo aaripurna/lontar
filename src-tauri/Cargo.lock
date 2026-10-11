@@ -3569,6 +3569,7 @@ dependencies = [
 name = "tauri-plugin-library"
 version = "0.1.0"
 dependencies = [
+ "dunce",
  "serde",
  "tauri",
  "tauri-plugin",

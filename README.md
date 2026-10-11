@@ -18,11 +18,10 @@ Go to the [download page](https://github.com/aaripurna/lontar/releases/latest) a
 | Your device | File to download |
 |---|---|
 | Android phone or tablet | the file ending in `.apk` |
+| Windows | the file ending in `-setup.exe` |
 | Mac | the file ending in `.dmg` |
 | Linux | the file ending in `.flatpak` or `.deb` |
 | iPhone or iPad | the file ending in `.ipa` (see the note below) |
-
-There's no Windows version yet.
 
 ### Android
 
@@ -30,6 +29,15 @@ There's no Windows version yet.
 2. Open it from your notifications or your **Downloads**.
 3. Your phone may say it isn't allowed to install apps from this source. Tap **Settings**, turn on **Allow from this source**, then go back and tap **Install**.
 4. If Google Play Protect warns you about an unknown app, tap **More details**, then **Install anyway**. This shows up because Lontar doesn't come from the Play Store.
+
+### Windows
+
+1. Open the downloaded `-setup.exe` file.
+2. Windows may show **Windows protected your PC**. Click **More info**, then **Run anyway**. This shows up because Lontar isn't registered with Microsoft, which costs a yearly fee, not because anything is wrong with it.
+3. Follow the installer. You don't need an administrator password. If your computer is missing a part Lontar needs (Microsoft WebView2), the installer downloads it, so stay connected to the internet.
+4. Open Lontar from the **Start** menu.
+
+To open an ebook with Lontar from File Explorer, right-click it, choose **Open with**, then **Lontar**.
 
 ### Mac
 
@@ -103,7 +111,7 @@ bun run tauri android dev    # Android emulator or device
 bun test src                 # tests
 ```
 
-To release, bump `version` in `src-tauri/tauri.conf.json` and push a `v*` tag. CI builds a signed Android APK, a universal macOS DMG, an unsigned iOS IPA, a Linux `.deb` and a Flatpak bundle, and attaches them to the GitHub release. The DMG is only Developer ID signed and notarized when the `APPLE_*` secrets are set (see `.github/workflows/release.yml`).
+To release, bump `version` in `src-tauri/tauri.conf.json` and push a `v*` tag. CI builds a signed Android APK, an unsigned Windows installer, a universal macOS DMG, an unsigned iOS IPA, a Linux `.deb` and a Flatpak bundle, and attaches them to the GitHub release. The DMG is only Developer ID signed and notarized when the `APPLE_*` secrets are set (see `.github/workflows/release.yml`).
 
 ## License
 

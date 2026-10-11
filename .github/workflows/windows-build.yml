@@ -1,0 +1,32 @@
+name: Windows test build
+
+# Builds the Windows installer without making a release, for trying it out. Run it from the
+# Actions tab ("Run workflow") or with `gh workflow run windows-build.yml`, then download the
+# installer from the run's Artifacts section.
+on:
+  workflow_dispatch:
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build installer
+        run: bun run tauri build --bundles nsis
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lontar-windows-x64-setup
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
