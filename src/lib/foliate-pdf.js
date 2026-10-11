@@ -7,6 +7,8 @@
 // - its runtime assets are served from /pdfjs/ (see pdfjsAssets in vite.config.js)
 // - the text and annotation layer styles come from pdfjs-dist's pdf_viewer.css
 // - optional margin trimming: each page can be shown cropped to its content (see trim.js)
+// - each render builds fresh text and link layers (upstream appends to the old ones), and a
+//   render overtaken by a newer one is discarded
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerSrc from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import viewerCSS from "pdfjs-dist/web/pdf_viewer.css?raw";
@@ -16,13 +18,16 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 const assetUrl = (dir) => new URL(`/pdfjs/${dir}/`, location.href).href;
 
+// Renders started for each page's document; only the latest one's result is shown, since
+// zooming and resizing can start a new render before the last one finishes.
+const latestRender = new WeakMap();
+
 // `crop` is the part of the page shown, in PDF units; the whole page is drawn, then shifted.
+// Resolves once the page, its text layer and its links are in place.
 const render = async (page, doc, zoom, crop) => {
+  const id = (latestRender.get(doc) ?? 0) + 1;
+  latestRender.set(doc, id);
   const scale = zoom * devicePixelRatio;
-  doc.documentElement.style.transform =
-    `scale(${1 / devicePixelRatio}) translate(${-crop.x * scale}px, ${-crop.y * scale}px)`;
-  doc.documentElement.style.transformOrigin = "top left";
-  doc.documentElement.style.setProperty("--scale-factor", scale);
   const viewport = page.getViewport({ scale });
 
   // the canvas must be in the `PDFDocument`'s `ownerDocument`
@@ -32,12 +37,15 @@ const render = async (page, doc, zoom, crop) => {
   canvas.width = viewport.width;
   const canvasContext = canvas.getContext("2d");
   await page.render({ canvasContext, viewport }).promise;
-  doc.querySelector("#canvas").replaceChildren(doc.adoptNode(canvas));
 
-  const container = doc.querySelector(".textLayer");
+  // The text and link layers are built in new elements and swapped in at the end: pdf.js
+  // appends to whatever is already there, and highlights point into the text layer, so it must
+  // hold exactly one copy of the page's text, always in the same structure.
+  const textDiv = doc.createElement("div");
+  textDiv.className = "textLayer";
   const textLayer = new pdfjsLib.TextLayer({
     textContentSource: await page.streamTextContent(),
-    container,
+    container: textDiv,
     viewport,
   });
   await textLayer.render();
@@ -56,21 +64,31 @@ const render = async (page, doc, zoom, crop) => {
 
   // fix text selection
   // https://github.com/mozilla/pdf.js/blob/642b9a5ae67ef642b9a8808fd9efd447e8c350e2/web/text_layer_builder.js#L105-L107
-  const endOfContent = document.createElement("div");
+  const endOfContent = doc.createElement("div");
   endOfContent.className = "endOfContent";
-  container.append(endOfContent);
-  container.onpointerdown = () => container.classList.add("selecting");
-  container.onpointerup = () => container.classList.remove("selecting");
+  textDiv.append(endOfContent);
+  textDiv.onpointerdown = () => textDiv.classList.add("selecting");
+  textDiv.onpointerup = () => textDiv.classList.remove("selecting");
 
-  const div = doc.querySelector(".annotationLayer");
+  const annotationDiv = doc.createElement("div");
+  annotationDiv.className = "annotationLayer";
   const linkService = {
     goToDestination: () => {},
     getDestinationHash: (dest) => JSON.stringify(dest),
     addLinkAttributes: (link, url) => (link.href = url),
   };
-  await new pdfjsLib.AnnotationLayer({ page, viewport, div, linkService }).render({
+  await new pdfjsLib.AnnotationLayer({ page, viewport, div: annotationDiv, linkService }).render({
     annotations: await page.getAnnotations(),
   });
+
+  if (latestRender.get(doc) !== id) return;
+  doc.documentElement.style.transform =
+    `scale(${1 / devicePixelRatio}) translate(${-crop.x * scale}px, ${-crop.y * scale}px)`;
+  doc.documentElement.style.transformOrigin = "top left";
+  doc.documentElement.style.setProperty("--scale-factor", scale);
+  doc.querySelector("#canvas").replaceChildren(doc.adoptNode(canvas));
+  doc.querySelector(".textLayer").replaceWith(textDiv);
+  doc.querySelector(".annotationLayer").replaceWith(annotationDiv);
 };
 
 const TRIM_SAMPLE_WIDTH = 300; // px; pages are rendered this small to find their content

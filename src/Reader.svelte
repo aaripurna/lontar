@@ -125,8 +125,9 @@
   let pageCfi = $state(null); // location of the page on screen
   let bookmarked = $derived(bookmarks.some((b) => isOnPage(b, pageCfi)));
 
-  // Highlights need text to select and foliate-js's overlay, which fixed-layout books lack.
-  let canAnnotate = $derived(canBookmark && reflowable);
+  // Highlights need selectable text: reflowable books, and PDFs through pdf.js's text layer
+  // (not scanned ones, which are just images). Comics have none.
+  let canAnnotate = $derived(canBookmark && (reflowable || book.format === "pdf"));
   let highlights = $state([]); // active highlights, in reading order
   let selection = $state.raw(null); // { doc, index, range, text } while text is selected
   let selectionTimer;
@@ -347,9 +348,12 @@
   function createHighlight(color, withNote = false) {
     const { doc, index, range, text } = selection;
     const location = view.getCFI(index, range);
+    // Fixed-layout pages are labelled by number, which also helps find a PDF highlight again
+    // should a newer pdf.js lay out the page's text differently.
+    const page = reflowable ? null : index + 1;
     const highlight = makeHighlight(location, text, color, {
       fraction: view.lastLocation?.fraction,
-      label: view.lastLocation?.tocItem?.label,
+      label: [page && `Page ${page}`, view.lastLocation?.tocItem?.label].filter(Boolean).join(" · "),
     });
     setHighlights([...(bookData.annotations ?? []), highlight]);
     doc.getSelection()?.removeAllRanges();
