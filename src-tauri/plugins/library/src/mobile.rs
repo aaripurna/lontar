@@ -4,7 +4,7 @@ use tauri::{
     AppHandle, Runtime,
 };
 
-use crate::{BookRef, Folder, FolderScan, SidecarFile, SidecarRef};
+use crate::{BookRef, Ebook, Folder, FolderScan, SidecarFile, SidecarRef};
 
 #[cfg(target_os = "ios")]
 tauri::ios_plugin_binding!(init_plugin_library);
@@ -77,6 +77,11 @@ struct CopyBookResponse {
 struct BarColorsArgs<'a> {
     color: &'a str,
     dark: bool,
+}
+
+#[derive(Deserialize)]
+struct OpenedBooksResponse {
+    books: Vec<Ebook>,
 }
 
 #[derive(Deserialize)]
@@ -161,6 +166,17 @@ impl<R: Runtime> Library<R> {
         };
         self.0
             .run_mobile_plugin::<()>("deleteSidecarFile", args)
+            .map_err(|e| e.to_string())
+    }
+
+    /// Books other apps sent to lontar ("Open with") since the last call. iOS has none yet.
+    pub fn take_opened_books(&self) -> Result<Vec<Ebook>, String> {
+        if cfg!(target_os = "ios") {
+            return Ok(Vec::new());
+        }
+        self.0
+            .run_mobile_plugin::<OpenedBooksResponse>("takeOpenedBooks", ())
+            .map(|r| r.books)
             .map_err(|e| e.to_string())
     }
 

@@ -8,6 +8,7 @@
 use std::collections::HashSet;
 #[cfg(desktop)]
 use std::path::PathBuf;
+#[cfg(desktop)]
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
@@ -67,6 +68,10 @@ pub struct Ebook {
     /// without a read per book. Conflict copies aren't merged here; opening the book does that.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sidecar: Option<String>,
+    /// A book opened from another app that lontar can read but has nowhere to keep a sidecar
+    /// for (Android, outside the library folders). Its progress isn't saved.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub read_only: bool,
 }
 
 /// Identifies a book's sidecar. Mirrors the fields of [`Ebook`] that locate it.
@@ -316,11 +321,13 @@ async fn delete_sidecar<R: Runtime>(app: tauri::AppHandle<R>, book: SidecarRef) 
 
 /// Books the OS asked us to open ("Open With", double-clicking a file), waiting for the
 /// frontend to take them. Kept until taken, since a launch by opening a file arrives before the
-/// frontend is listening.
+/// frontend is listening. On Android the plugin's native side keeps them instead.
+#[cfg(desktop)]
 #[derive(Default)]
 struct OpenedBooks(Mutex<Vec<Ebook>>);
 
 /// Emitted when a book is opened from the OS; the frontend then calls `take_opened_books`.
+#[cfg(desktop)]
 const OPENED_EVENT: &str = "library://opened";
 
 /// Queues the ebooks among `paths` to be opened, and tells the frontend. Other files are
@@ -337,8 +344,11 @@ pub fn open_files<R: Runtime>(app: &AppHandle<R>, paths: impl IntoIterator<Item 
 
 /// Returns the books opened from the OS since the last call, oldest first.
 #[tauri::command]
-fn take_opened_books<R: Runtime>(app: AppHandle<R>) -> Vec<Ebook> {
-    std::mem::take(&mut *app.state::<OpenedBooks>().0.lock().unwrap())
+fn take_opened_books<R: Runtime>(app: AppHandle<R>) -> Result<Vec<Ebook>, String> {
+    #[cfg(desktop)]
+    return Ok(std::mem::take(&mut *app.state::<OpenedBooks>().0.lock().unwrap()));
+    #[cfg(mobile)]
+    app.state::<Library<R>>().take_opened_books()
 }
 
 /// Colours the area behind the system status and navigation bars, and picks light or dark
@@ -379,6 +389,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             #[cfg(mobile)]
             let library = mobile::init(app, api)?;
             app.manage(library);
+            #[cfg(desktop)]
             app.manage(OpenedBooks::default());
             // Windows and Linux launch the app with the file to open as an argument.
             #[cfg(desktop)]

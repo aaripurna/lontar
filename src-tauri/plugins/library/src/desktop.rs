@@ -157,6 +157,7 @@ pub fn opened_book(path: &Path) -> Option<Ebook> {
         format,
         size: metadata.len(),
         sidecar: None,
+        read_only: false,
     })
 }
 
@@ -204,6 +205,7 @@ fn collect_ebooks(dir: &Path, found: &mut FolderScan) {
                     format,
                     size: entry.metadata().map(|m| m.len()).unwrap_or(0),
                     sidecar: fs::read_to_string(sidecar).ok(),
+                    read_only: false,
                 });
             }
         }

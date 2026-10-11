@@ -527,7 +527,8 @@
     title = metaTitle && metaTitle !== file.name ? metaTitle : book.name;
 
     try {
-      bookData = (await loadBookData(book)) ?? {};
+      // A book opened from another app, outside the library, has nowhere to save to.
+      if (!book.readOnly) bookData = (await loadBookData(book)) ?? {};
       // Merging sync-conflict copies may have changed it since the scan.
       if (bookData.progress) onprogress?.(book, bookData.progress);
       bookmarks = activeItems(bookData.bookmarks);
@@ -635,6 +636,7 @@
   <footer class="reader-bar reader-footer">
     {#if fraction != null}{percent.format(fraction)}{/if}
     {#if saveError}<span class="save-error" title={saveError}>· progress not saved</span>{/if}
+    {#if book.readOnly}<span title="Opened from another app. Add its folder to your library to save progress, bookmarks and highlights.">· not in your library</span>{/if}
   </footer>
 
   {#if selection && !panel}

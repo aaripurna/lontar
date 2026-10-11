@@ -210,12 +210,24 @@
     history.back(); // onPopState switches the page
   }
 
+  // The first scan, which books opened from the OS may need to find their library entry.
+  let firstScan = Promise.resolve();
+
   // Books opened from the OS ("Open With", double-clicking a file) go straight to the reader.
-  // One that's in the library opens as its library entry, so the list shows its progress.
+  // One that's in the library opens as its library entry, so the list shows its progress and
+  // (on Android) it gets its sidecar.
   async function takeOpenedBooks() {
     const opened = await invoke("plugin:library|take_opened_books");
-    const book = opened.at(-1);
-    if (!book || reading?.path === book.path) return;
+    let book = opened.at(-1);
+    if (!book) return;
+    if (book.readOnly) {
+      // Android file managers send their own URI for a file, which can't be traced back to a
+      // library folder; a single library book with the same name and size is taken to be it.
+      await firstScan;
+      const same = books.filter((b) => b.fileName === book.fileName && b.size === book.size);
+      if (same.length === 1) book = same[0];
+    }
+    if (reading?.path === book.path) return;
     reading = books.find((b) => b.path === book.path) ?? book;
   }
 
@@ -237,13 +249,16 @@
   }
 
   onMount(() => {
-    refresh();
-    // Listen first, then take what arrived before, so no opened book is missed.
+    firstScan = refresh();
+    // Listen first, then take what arrived before, so no opened book is missed. Android has no
+    // event; a book sent from another app brings lontar back to the foreground instead.
     const openedBook = () => takeOpenedBooks().catch((e) => console.warn("Couldn't open the book", e));
     const unlisten = listen("library://opened", openedBook).then((unlisten) => {
       openedBook();
       return unlisten;
     });
+    const onVisible = () => document.visibilityState === "visible" && openedBook();
+    document.addEventListener("visibilitychange", onVisible);
     const onSchemeChange = (e) => (systemDark = e.matches);
     darkQuery.addEventListener("change", onSchemeChange);
     window.addEventListener("popstate", onPopState);
@@ -251,6 +266,7 @@
       darkQuery.removeEventListener("change", onSchemeChange);
       window.removeEventListener("popstate", onPopState);
       unlisten.then((unlisten) => unlisten());
+      document.removeEventListener("visibilitychange", onVisible);
     };
   });
 </script>

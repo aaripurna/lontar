@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
+import android.provider.OpenableColumns
 import androidx.activity.result.ActivityResult
 import androidx.core.view.WindowCompat
 import app.tauri.annotation.ActivityCallback
@@ -59,6 +60,27 @@ class SidecarArgs {
 
 private const val SIDECAR_SUFFIX = ".lontar"
 
+private const val EXTERNAL_STORAGE = "com.android.externalstorage.documents"
+
+// Stands in for the library folder of a book opened from another app that isn't in the
+// library. Such a book can be read (see `openedUris`) but has nowhere to keep a sidecar.
+private const val OPENED_FOLDER = "opened"
+
+// For books opened from other apps without a usable file name. Matches the MIME types the
+// manifest's "Open with" intent filter accepts.
+private val MIME_FORMATS = mapOf(
+  "application/epub+zip" to "epub",
+  "application/pdf" to "pdf",
+  "application/x-mobipocket-ebook" to "mobi",
+  "application/vnd.amazon.ebook" to "azw",
+  "application/vnd.amazon.mobi8-ebook" to "azw3",
+  "application/x-mobi8-ebook" to "azw3",
+  "application/x-fictionbook+xml" to "fb2",
+  "application/x-fictionbook" to "fb2",
+  "application/vnd.comicbook+zip" to "cbz",
+  "application/x-cbz" to "cbz",
+)
+
 private const val READ_WRITE =
   Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
 
@@ -67,6 +89,121 @@ private const val READ_WRITE =
 // be rescanned after the app restarts, and released when the folder is removed from the library.
 @TauriPlugin
 class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
+
+  // Books opened from other apps ("Open with"), waiting for the frontend to take them.
+  private val openedBooks = mutableListOf<JSObject>()
+  // Documents other apps have let us read by opening them here. The grant lasts as long as
+  // the activity, so only these can be read outside the library folders.
+  private val openedUris = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+  private var launchIntentHandled = false
+
+  override fun onNewIntent(intent: Intent) {
+    synchronized(openedBooks) {
+      handleLaunchIntent() // keep the books in the order they were opened
+      handleViewIntent(intent)
+    }
+  }
+
+  // The frontend calls this at startup and whenever the app comes back to the foreground,
+  // which it does after being sent a book.
+  @Command
+  fun takeOpenedBooks(invoke: Invoke) {
+    val books = JSArray()
+    synchronized(openedBooks) {
+      handleLaunchIntent()
+      openedBooks.forEach { books.put(it) }
+      openedBooks.clear()
+    }
+    invoke.resolve(JSObject().put("books", books))
+  }
+
+  private fun handleLaunchIntent() {
+    if (launchIntentHandled) return
+    launchIntentHandled = true
+    handleViewIntent(activity.intent)
+  }
+
+  private fun handleViewIntent(intent: Intent?) {
+    if (intent?.action != Intent.ACTION_VIEW) return
+    val uri = intent.data ?: return
+    try {
+      openedBook(uri, intent.type)?.let { openedBooks.add(it) }
+    } catch (e: Exception) {
+      android.util.Log.w("LibraryPlugin", "Couldn't open $uri", e)
+    }
+  }
+
+  // Describes a book sent by another app like a scanned one. A book inside a library folder
+  // gets its library location, so it opens with its sidecar; any other is marked `readOnly`.
+  private fun openedBook(uri: Uri, mimeType: String?): JSObject? {
+    var displayName: String? = null
+    var size = 0L
+    try {
+      activity.contentResolver.query(
+        uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null
+      )?.use {
+        if (it.moveToFirst()) {
+          displayName = it.getString(0)
+          if (!it.isNull(1)) size = it.getLong(1)
+        }
+      }
+    } catch (e: SecurityException) {
+      // Not granted for this URI itself, e.g. a library book sent by its storage URI, which is
+      // only reachable through the library folder's grant. The URI still names the file.
+    }
+    val fileName = displayName ?: uri.lastPathSegment?.substringAfterLast('/') ?: return null
+    val dot = fileName.lastIndexOf('.')
+    val format = fileName.substring(dot + 1).lowercase().takeIf { dot > 0 && it in EBOOK_EXTENSIONS }
+      ?: MIME_FORMATS[mimeType ?: activity.contentResolver.getType(uri)]
+      ?: return null
+
+    val book = JSObject()
+    book.put("name", if (dot > 0) fileName.substring(0, dot) else fileName)
+    book.put("fileName", fileName)
+    book.put("format", format)
+    book.put("size", size)
+    val inLibrary = libraryLocation(uri)
+    if (inLibrary != null) {
+      val (treeUri, docId) = inLibrary
+      book.put("path", DocumentsContract.buildDocumentUriUsingTree(treeUri, docId).toString())
+      book.put("folderId", treeUri.toString())
+      book.put("dir", parentDocumentId(docId))
+    } else {
+      openedUris.add(uri.toString())
+      book.put("path", uri.toString())
+      book.put("folderId", OPENED_FOLDER)
+      book.put("dir", "")
+      book.put("readOnly", true)
+    }
+    return book
+  }
+
+  // The library folder holding the document, if any, with the document's id. Only for the
+  // device storage provider, whose document ids are paths ("primary:Books/Dune.epub"), so
+  // containment can be told from the ids. File managers that send their own URIs are matched
+  // to library books by the frontend instead.
+  private fun libraryLocation(uri: Uri): Pair<Uri, String>? {
+    if (uri.authority != EXTERNAL_STORAGE || !DocumentsContract.isDocumentUri(activity, uri)) {
+      return null
+    }
+    val docId = DocumentsContract.getDocumentId(uri)
+    for (perm in activity.contentResolver.persistedUriPermissions) {
+      val tree = perm.uri
+      if (tree.authority != EXTERNAL_STORAGE || !perm.isWritePermission) continue
+      val treeId = try {
+        DocumentsContract.getTreeDocumentId(tree)
+      } catch (e: Exception) {
+        continue
+      }
+      // A volume's root ("primary:") has children "primary:Books"; others "primary:Books/x".
+      val prefix = if (treeId.endsWith(":")) treeId else "$treeId/"
+      if (docId.startsWith(prefix)) return tree to docId
+    }
+    return null
+  }
+
+  private fun parentDocumentId(docId: String): String =
+    if (docId.contains('/')) docId.substringBeforeLast('/') else docId.substringBefore(':') + ":"
 
   @Command
   fun pickFolder(invoke: Invoke) {
@@ -144,9 +281,12 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
     val args = invoke.parseArgs(BookArgs::class.java)
     Thread {
       try {
-        if (!args.path.startsWith(args.folderId + "/document/")) {
-          throw Exception("That book is outside the library folder.")
+        val allowed = if (args.folderId == OPENED_FOLDER) {
+          args.path in openedUris
+        } else {
+          args.path.startsWith(args.folderId + "/document/")
         }
+        if (!allowed) throw Exception("That book is outside the library folder.")
         val copy = java.io.File.createTempFile("book", null, activity.cacheDir)
         val input = activity.contentResolver.openInputStream(Uri.parse(args.path))
           ?: throw Exception("Couldn't open the book")
