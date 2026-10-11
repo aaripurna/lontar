@@ -33,7 +33,7 @@
   // Reading settings are per device (a phone and a laptop want different sizes), so they live
   // in localStorage rather than the synced sidecar.
   const SETTINGS_KEY = "lontar.readerSettings";
-  const DEFAULT_SETTINGS = { fontSize: 100, lineHeight: 1.5, theme: "auto", zoom: 100, trimMargins: false };
+  const DEFAULT_SETTINGS = { fontSize: 100, lineHeight: 1.5, theme: "auto", zoom: 100, trimMargins: false, tapToTurn: false };
 
   function loadSettings() {
     try {
@@ -213,9 +213,11 @@
     if (active) node.scrollIntoView({ block: "center" });
   }
 
-  // Tapping the outer thirds of the page turns it; the middle third opens the controls.
-  // Returns the page-turn function for a tap, or null if the tap should be left alone.
-  function tapAction(target, clientX, clientY) {
+  // Tapping the middle third of the page opens the controls. Clicking the outer thirds turns
+  // the page; with touch they do nothing unless the "tap to turn" setting is on (it's too easy
+  // to tap them by accident while holding a phone), and pages are turned by swiping.
+  // Returns what a tap should do, or null if it should be left alone.
+  function tapAction(target, clientX, clientY, turnsPages) {
     const doc = target.ownerDocument;
     if (target.closest?.("a") || !doc.getSelection()?.isCollapsed) return null;
     // A tap on a highlight opens it, wherever on the page it is.
@@ -231,36 +233,53 @@
     const x = rect.left + clientX * scale;
     const { left, width } = container.getBoundingClientRect();
     const position = (x - left) / width;
-    if (position < 1 / 3) return () => view.goLeft();
-    if (position > 2 / 3) return () => view.goRight();
+    if (position < 1 / 3) return turnsPages ? () => view.goLeft() : () => {};
+    if (position > 2 / 3) return turnsPages ? () => view.goRight() : () => {};
     return () => openPanel("controls");
   }
 
   function onClick(event) {
-    tapAction(event.target, event.clientX, event.clientY)?.();
+    tapAction(event.target, event.clientX, event.clientY, true)?.();
   }
 
-  // foliate-js snaps to the nearest page on every touchend. If a tap also turns the page, the
-  // two navigations race, and when both cross into another section the paginator can lock up
-  // for good. So a tap on a page-turn zone is handled here, before foliate's own listeners,
-  // and kept from them. Swipes and long presses still go to foliate.
+  // Touch is handled here, before foliate-js's own listeners. Reflowable books turn pages with
+  // foliate-js's swipe; fixed-layout ones (PDFs, comics) have none, so swipes are turned into
+  // page turns here. Taps are kept from foliate-js: it snaps to the nearest page on every
+  // touchend, and a snap racing another navigation can lock the paginator up for good.
+  const SWIPE_MIN = 40; // px of horizontal travel
   let touchStart = null;
 
   function onTouchStart(event) {
     const t = event.changedTouches[0];
-    touchStart = event.touches.length === 1 ? { x: t.screenX, y: t.screenY, time: event.timeStamp } : null;
+    if (event.touches.length !== 1) {
+      touchStart = null;
+      return;
+    }
+    // Where a zoomed page was scrolled to: a swipe only turns the page from its edge, so that
+    // dragging around the page doesn't.
+    const r = view.renderer;
+    const scroll = reflowable ? null : { left: r.scrollLeft, max: r.scrollWidth - r.clientWidth };
+    touchStart = { x: t.screenX, y: t.screenY, time: event.timeStamp, scroll };
   }
 
   function onTouchEnd(event) {
     const start = touchStart;
     touchStart = null;
     const t = event.changedTouches[0];
-    if (!start || event.timeStamp - start.time > 500) return;
-    if (Math.hypot(t.screenX - start.x, t.screenY - start.y) > 10) return;
-    const action = tapAction(event.target, t.clientX, t.clientY);
+    if (!start) return;
+    const dx = t.screenX - start.x;
+    const dy = t.screenY - start.y;
+    if (Math.hypot(dx, dy) > 10) {
+      const swipe = start.scroll && event.timeStamp - start.time < 800 && Math.abs(dx) > SWIPE_MIN && Math.abs(dx) > 1.5 * Math.abs(dy);
+      if (swipe && dx < 0 && start.scroll.left >= start.scroll.max - 1) view.goRight();
+      else if (swipe && dx > 0 && start.scroll.left <= 1) view.goLeft();
+      return;
+    }
+    if (event.timeStamp - start.time > 500) return;
+    const action = tapAction(event.target, t.clientX, t.clientY, settings.tapToTurn);
     if (!action) return;
     event.stopPropagation();
-    event.preventDefault(); // also suppresses the click, so the page isn't turned twice
+    event.preventDefault(); // also suppresses the click, which would turn the page
     action();
   }
 
@@ -679,6 +698,14 @@
           </div>
         {/if}
       {/if}
+
+      <div class="sheet-row">
+        <span class="sheet-label">Turn pages</span>
+        <div class="segmented">
+          <button aria-pressed={!settings.tapToTurn} onclick={() => (settings.tapToTurn = false)}>Swipe</button>
+          <button aria-pressed={settings.tapToTurn} onclick={() => (settings.tapToTurn = true)}>Swipe or tap</button>
+        </div>
+      </div>
 
       <div class="sheet-row">
         <span class="sheet-label">Theme</span>
