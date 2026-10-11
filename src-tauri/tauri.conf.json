@@ -36,6 +36,63 @@
     ],
     "macOS": {
       "signingIdentity": "-"
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "epub"
+        ],
+        "name": "EPUB ebook",
+        "description": "EPUB ebook",
+        "role": "Viewer",
+        "mimeType": "application/epub+zip",
+        "contentTypes": [
+          "org.idpf.epub-container"
+        ]
+      },
+      {
+        "ext": [
+          "pdf"
+        ],
+        "name": "PDF document",
+        "description": "PDF document",
+        "role": "Viewer",
+        "mimeType": "application/pdf",
+        "contentTypes": [
+          "com.adobe.pdf"
+        ],
+        "rank": "Alternate"
+      },
+      {
+        "ext": [
+          "mobi",
+          "azw",
+          "azw3",
+          "kf8"
+        ],
+        "name": "Kindle ebook",
+        "description": "Kindle ebook",
+        "role": "Viewer",
+        "mimeType": "application/x-mobipocket-ebook"
+      },
+      {
+        "ext": [
+          "fb2"
+        ],
+        "name": "FictionBook ebook",
+        "description": "FictionBook ebook",
+        "role": "Viewer",
+        "mimeType": "application/x-fictionbook+xml"
+      },
+      {
+        "ext": [
+          "cbz"
+        ],
+        "name": "Comic book archive",
+        "description": "Comic book archive",
+        "role": "Viewer",
+        "mimeType": "application/vnd.comicbook+zip"
+      }
+    ]
   }
 }

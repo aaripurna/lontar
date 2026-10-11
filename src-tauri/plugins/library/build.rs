@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "delete_sidecar_conflict",
     "delete_sidecar",
     "set_bar_colors",
+    "take_opened_books",
 ];
 
 fn main() {

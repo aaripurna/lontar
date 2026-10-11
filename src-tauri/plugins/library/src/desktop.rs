@@ -140,6 +140,26 @@ fn ebook_format(path: &Path) -> Option<String> {
     EBOOK_EXTENSIONS.contains(&ext.as_str()).then_some(ext)
 }
 
+/// A book file the OS asked us to open, described like a scanned one. Its own directory stands
+/// in for the library folder, so its sidecar is read and written next to it as usual. `None`
+/// if it isn't an ebook file.
+pub fn opened_book(path: &Path) -> Option<Ebook> {
+    let path = fs::canonicalize(path).ok()?;
+    let metadata = fs::metadata(&path).ok()?;
+    let format = ebook_format(&path).filter(|_| metadata.is_file())?;
+    let dir = path.parent()?.to_string_lossy().into_owned();
+    Some(Ebook {
+        name: path.file_stem()?.to_string_lossy().into_owned(),
+        file_name: path.file_name()?.to_string_lossy().into_owned(),
+        path: path.to_string_lossy().into_owned(),
+        folder_id: dir.clone(),
+        dir,
+        format,
+        size: metadata.len(),
+        sidecar: None,
+    })
+}
+
 // Recurses into subdirectories, skipping hidden entries and symlinks (which could loop).
 // Unreadable subdirectories are skipped so one bad folder doesn't fail the whole scan.
 fn collect_ebooks(dir: &Path, found: &mut FolderScan) {

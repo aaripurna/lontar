@@ -717,6 +717,8 @@ button {
 
 .reader-search form {
   position: sticky;
+  /* above the results scrolling under it: the faded headings (opacity) are layered too */
+  z-index: 1;
   top: -1em;
   margin: -1em -1em 0;
   padding: 1em 1em 0.5em;

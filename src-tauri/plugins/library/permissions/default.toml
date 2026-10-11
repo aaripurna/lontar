@@ -1,5 +1,5 @@
 [default]
-description = "Allows picking library folders, scanning them for ebooks, opening books, and reading, writing and moving each book's .lontar sidecar, and colouring the system bars."
+description = "Allows picking library folders, scanning them for ebooks, opening books, and reading, writing and moving each book's .lontar sidecar, colouring the system bars, and receiving books opened from the OS."
 permissions = [
   "allow-pick-folder",
   "allow-release-folder",
@@ -11,4 +11,5 @@ permissions = [
   "allow-delete-sidecar-conflict",
   "allow-delete-sidecar",
   "allow-set-bar-colors",
+  "allow-take-opened-books",
 ]

@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { listen } from "@tauri-apps/api/event";
   import Reader from "./Reader.svelte";
   import Cover from "./Cover.svelte";
   import { getBookMeta, pauseBackground, pruneCovers } from "./lib/covers.js";
@@ -209,8 +210,17 @@
     history.back(); // onPopState switches the page
   }
 
-  // The reader keeps its own history entries and can only be opened from home, so a popstate
-  // while on the folders page is always this page's back.
+  // Books opened from the OS ("Open With", double-clicking a file) go straight to the reader.
+  // One that's in the library opens as its library entry, so the list shows its progress.
+  async function takeOpenedBooks() {
+    const opened = await invoke("plugin:library|take_opened_books");
+    const book = opened.at(-1);
+    if (!book || reading?.path === book.path) return;
+    reading = books.find((b) => b.path === book.path) ?? book;
+  }
+
+  // The reader keeps its own history entries, and closing it pops one while `reading` is still
+  // set, so otherwise a popstate on the folders page is always this page's back.
   function onPopState() {
     if (page === "folders" && !reading) page = "books";
   }
@@ -228,12 +238,19 @@
 
   onMount(() => {
     refresh();
+    // Listen first, then take what arrived before, so no opened book is missed.
+    const openedBook = () => takeOpenedBooks().catch((e) => console.warn("Couldn't open the book", e));
+    const unlisten = listen("library://opened", openedBook).then((unlisten) => {
+      openedBook();
+      return unlisten;
+    });
     const onSchemeChange = (e) => (systemDark = e.matches);
     darkQuery.addEventListener("change", onSchemeChange);
     window.addEventListener("popstate", onPopState);
     return () => {
       darkQuery.removeEventListener("change", onSchemeChange);
       window.removeEventListener("popstate", onPopState);
+      unlisten.then((unlisten) => unlisten());
     };
   });
 </script>

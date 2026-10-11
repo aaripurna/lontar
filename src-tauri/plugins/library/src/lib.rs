@@ -6,12 +6,17 @@
 //! ids back to `scan`.
 
 use std::collections::HashSet;
+#[cfg(desktop)]
+use std::path::PathBuf;
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use tauri::{
     plugin::{Builder, TauriPlugin},
-    Manager, Runtime,
+    AppHandle, Manager, Runtime,
 };
+#[cfg(desktop)]
+use tauri::Emitter;
 
 #[cfg(desktop)]
 mod desktop;
@@ -309,6 +314,33 @@ async fn delete_sidecar<R: Runtime>(app: tauri::AppHandle<R>, book: SidecarRef) 
         .map_err(|e| e.to_string())?
 }
 
+/// Books the OS asked us to open ("Open With", double-clicking a file), waiting for the
+/// frontend to take them. Kept until taken, since a launch by opening a file arrives before the
+/// frontend is listening.
+#[derive(Default)]
+struct OpenedBooks(Mutex<Vec<Ebook>>);
+
+/// Emitted when a book is opened from the OS; the frontend then calls `take_opened_books`.
+const OPENED_EVENT: &str = "library://opened";
+
+/// Queues the ebooks among `paths` to be opened, and tells the frontend. Other files are
+/// ignored. Called for files opened from the OS, including by a second launch of the app.
+#[cfg(desktop)]
+pub fn open_files<R: Runtime>(app: &AppHandle<R>, paths: impl IntoIterator<Item = PathBuf>) {
+    let books: Vec<Ebook> = paths.into_iter().filter_map(|p| desktop::opened_book(&p)).collect();
+    if books.is_empty() {
+        return;
+    }
+    app.state::<OpenedBooks>().0.lock().unwrap().extend(books);
+    let _ = app.emit(OPENED_EVENT, ());
+}
+
+/// Returns the books opened from the OS since the last call, oldest first.
+#[tauri::command]
+fn take_opened_books<R: Runtime>(app: AppHandle<R>) -> Vec<Ebook> {
+    std::mem::take(&mut *app.state::<OpenedBooks>().0.lock().unwrap())
+}
+
 /// Colours the area behind the system status and navigation bars, and picks light or dark
 /// icons for them. Only Android needs this; elsewhere the app draws behind the bars itself.
 #[tauri::command]
@@ -338,7 +370,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             read_sidecar_conflicts,
             delete_sidecar_conflict,
             delete_sidecar,
-            set_bar_colors
+            set_bar_colors,
+            take_opened_books
         ])
         .setup(|app, api| {
             #[cfg(desktop)]
@@ -346,7 +379,18 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             #[cfg(mobile)]
             let library = mobile::init(app, api)?;
             app.manage(library);
+            app.manage(OpenedBooks::default());
+            // Windows and Linux launch the app with the file to open as an argument.
+            #[cfg(desktop)]
+            open_files(app, std::env::args_os().skip(1).map(PathBuf::from));
             Ok(())
+        })
+        .on_event(|_app, _event| {
+            // macOS hands files to the running app instead, at launch too.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = _event {
+                open_files(_app, urls.iter().filter_map(|url| url.to_file_path().ok()));
+            }
         })
         .build()
 }
