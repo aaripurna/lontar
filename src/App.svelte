@@ -3,7 +3,8 @@
   import { invoke } from "@tauri-apps/api/core";
   import Reader from "./Reader.svelte";
   import Cover from "./Cover.svelte";
-  import { pruneCovers } from "./lib/covers.js";
+  import { getBookMeta, pauseBackground, pruneCovers } from "./lib/covers.js";
+  import { displayTitle, filterBooks, sortBooks } from "./lib/library.js";
   import { scannedProgress } from "./lib/sidecar.js";
   import { setBarColors } from "./lib/bars.js";
 
@@ -27,17 +28,18 @@
   // book path -> reading progress ({ fraction, updatedAt, ... }) from its sidecar
   let progress = $state({});
 
+  // book path -> { title, author, authorSort } from the book's metadata, filled in as books
+  // are read in the background (see covers.js); until then a book goes by its file name.
+  let bookInfo = $state({});
+  let query = $state("");
+
   const SORT_KEY = "lontar.librarySort";
-  let sortBy = $state(loadSort()); // "title" or "recent"
-  // Books arrive sorted by title. Recent puts the most recently read first; the sort is
-  // stable, so unread books keep their title order at the end.
-  let sortedBooks = $derived(
-    sortBy === "recent"
-      ? [...books].sort((a, b) =>
-          (progress[b.path]?.updatedAt ?? "").localeCompare(progress[a.path]?.updatedAt ?? ""),
-        )
-      : books,
-  );
+  const SORTS = { title: "Title", author: "Author", recent: "Recent" };
+  let sortBy = $state(loadSort());
+  let shownBooks = $derived(filterBooks(sortBooks(books, sortBy, bookInfo, progress), query, bookInfo));
+
+  // Reading books in the background would compete with the one being read.
+  $effect(() => pauseBackground(!!reading));
 
   const percent = new Intl.NumberFormat(undefined, { style: "percent" });
 
@@ -50,7 +52,8 @@
 
   function loadSort() {
     try {
-      return localStorage.getItem(SORT_KEY) === "recent" ? "recent" : "title";
+      const saved = localStorage.getItem(SORT_KEY);
+      return saved in SORTS ? saved : "title";
     } catch {
       return "title";
     }
@@ -98,11 +101,23 @@
       books = result.books.map(({ sidecar, ...book }) => book);
       // With a folder missing, its covers would be dropped and remade later, so wait.
       if (!result.errors.length) pruneCovers(books).catch((e) => console.warn(e));
+      loadBookInfo(books);
       folderErrors = Object.fromEntries(result.errors.map((e) => [e.folderId, e.message]));
     } catch (e) {
       error = String(e);
     } finally {
       loading = false;
+    }
+  }
+
+  // Titles and authors for sorting and search, in the background, one book at a time.
+  function loadBookInfo(list) {
+    for (const book of list) {
+      if (bookInfo[book.path]) continue;
+      getBookMeta(book).then(
+        (meta) => (bookInfo[book.path] = meta),
+        (e) => console.warn(`No metadata for ${book.fileName}`, e),
+      );
     }
   }
 
@@ -241,21 +256,41 @@
         <button onclick={openFolders}>Manage folders</button>
       </div>
     {:else}
+      <input
+        class="library-search"
+        type="search"
+        enterkeyhint="search"
+        placeholder="Search title or author"
+        aria-label="Search books"
+        bind:value={query}
+      />
       <div class="list-header">
-        <p class="status">{books.length} {books.length === 1 ? "book" : "books"}</p>
+        <p class="status">
+          {#if query.trim()}
+            {shownBooks.length} of {books.length}
+          {:else}
+            {books.length} {books.length === 1 ? "book" : "books"}
+          {/if}
+        </p>
         <div class="sort" role="group" aria-label="Sort books">
-          <button aria-pressed={sortBy === "title"} onclick={() => setSort("title")}>Title</button>
-          <button aria-pressed={sortBy === "recent"} onclick={() => setSort("recent")}>Recent</button>
+          {#each Object.entries(SORTS) as [value, label]}
+            <button aria-pressed={sortBy === value} onclick={() => setSort(value)}>{label}</button>
+          {/each}
         </div>
       </div>
+      {#if !shownBooks.length}
+        <p class="status">No books match “{query.trim()}”.</p>
+      {/if}
       <ul class="books">
-        {#each sortedBooks as book (book.path)}
+        {#each shownBooks as book (book.path)}
           {@const read = progress[book.path]}
+          {@const info = bookInfo[book.path]}
           <li style:--progress={read?.fraction ?? 0}>
             <button class="book" title={book.path} onclick={() => (reading = book)}>
               <Cover {book} />
               <span class="book-text">
-                <span class="name">{book.name}</span>
+                <span class="name">{displayTitle(book, info)}</span>
+                {#if info?.author}<span class="author">{info.author}</span>{/if}
                 <span class="meta">
                   {book.format.toUpperCase()} ·
                   {#if read}

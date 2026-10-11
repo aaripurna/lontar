@@ -1,11 +1,12 @@
-// Book cover thumbnails for the library.
+// Book cover thumbnails and metadata (title, author) for the library.
 //
-// Getting a cover means reading and parsing the whole book, so thumbnails are made once and
-// cached in IndexedDB. They're derived data and device-local, so they don't belong in the
-// synced sidecar. Requests are queued and handled one at a time to keep memory in check: a
-// single book can be tens of MB.
+// Getting them means reading and parsing the whole book, so they're read once and cached in
+// IndexedDB. They're derived data and device-local, so they don't belong in the synced
+// sidecar. Books are parsed one at a time to keep memory in check (a single book can be tens
+// of MB): rows on screen first, then the rest of the library in the background.
 import { invoke } from "@tauri-apps/api/core";
 import { READABLE_FORMATS, openBookFile } from "./formats.js";
+import { bookMetadata } from "./metadata.js";
 
 const DB_NAME = "lontar-covers";
 const STORE = "covers";
@@ -23,7 +24,10 @@ export function thumbnailSize(width, height, maxHeight = THUMB_HEIGHT) {
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
-// --- IndexedDB (records: { blob: Blob | null }, null meaning "this book has no cover") ---
+// --- IndexedDB ---
+// Records: { blob: Blob | null, meta: { title, author, authorSort } }, a null blob meaning
+// "this book has no cover". Records from before metadata was kept have no `meta`, and are
+// read again.
 
 let dbPromise;
 
@@ -75,49 +79,108 @@ async function downscale(blob) {
   return new Promise((resolve) => canvas.toBlob(resolve, THUMB_TYPE, 0.8));
 }
 
-async function extractCover(book) {
+async function extractInfo(book) {
   const bytes = await invoke("plugin:library|read_book", {
     book: { folderId: book.folderId, path: book.path },
   });
   // foliate-js recognises some formats by extension, so give it the lowercase one.
-  const parsed = await openBookFile(new File([bytes], `${book.name}.${book.format}`), book.format);
+  const fileName = `${book.name}.${book.format}`;
+  const parsed = await openBookFile(new File([bytes], fileName), book.format);
   try {
     const cover = await parsed.getCover?.();
-    return cover ? await downscale(cover) : null;
+    return { blob: cover ? await downscale(cover) : null, meta: bookMetadata(parsed.metadata, fileName) };
   } finally {
     parsed.destroy?.();
   }
 }
 
-// One extraction at a time; covers already cached skip the queue.
-let queue = Promise.resolve();
+// --- The queue: one book at a time ---
+// Jobs for rows on screen go first. Background jobs wait while paused, e.g. while reading, so
+// they don't compete with the book being read.
 
-function enqueue(task) {
-  const run = queue.then(task);
-  queue = run.catch(() => {});
-  return run;
+const waiting = []; // [{ key, task, resolve, reject, urgent }]
+let running = false;
+let paused = false;
+
+function schedule(key, task, urgent) {
+  return new Promise((resolve, reject) => {
+    const job = { key, task, resolve, reject, urgent };
+    if (urgent) waiting.unshift(job);
+    else waiting.push(job);
+    pump();
+  });
 }
 
-// Within a session, each book's cover is looked up once: key -> Promise<Blob | null>.
+// Moves a waiting background job to the front, when its row comes on screen.
+function hurry(key) {
+  const i = waiting.findIndex((job) => job.key === key && !job.urgent);
+  if (i === -1) return;
+  const [job] = waiting.splice(i, 1);
+  job.urgent = true;
+  waiting.unshift(job);
+}
+
+async function pump() {
+  if (running) return;
+  running = true;
+  for (;;) {
+    const i = waiting.findIndex((job) => job.urgent || !paused);
+    if (i === -1) break;
+    const [job] = waiting.splice(i, 1);
+    try {
+      job.resolve(await job.task());
+    } catch (e) {
+      job.reject(e);
+    }
+  }
+  running = false;
+}
+
+/** Pauses (or resumes) reading books in the background; rows on screen still get theirs. */
+export function pauseBackground(value) {
+  paused = value;
+  if (!paused) pump();
+}
+
+// Within a session, each book is looked up once: key -> Promise<record>.
 const pending = new Map();
+// Books wanted for rows on screen, also while their lookup is still checking the cache.
+const onScreen = new Set();
+
+function getInfo(book, urgent) {
+  const key = coverKey(book);
+  if (urgent) onScreen.add(key);
+  if (pending.has(key)) {
+    if (urgent) hurry(key);
+    return pending.get(key);
+  }
+  const promise = (async () => {
+    const cached = await cacheGet(key).catch(() => undefined);
+    if (cached?.meta) return cached;
+    const record = await schedule(key, () => extractInfo(book), onScreen.has(key));
+    await cachePut(key, record).catch((e) => console.warn("Couldn't cache book info", e));
+    return record;
+  })();
+  // Failures aren't kept, so a book that couldn't be read is retried next time.
+  promise.catch(() => pending.delete(key));
+  pending.set(key, promise);
+  return promise;
+}
 
 /**
  * Returns the book's cover thumbnail as a Blob, or null if it has none (or its format can't
- * be opened). Failures aren't cached, so a book that couldn't be read is retried next time.
+ * be opened). For rows on screen, so it jumps the queue.
  */
-export function getCover(book) {
-  if (!READABLE_FORMATS.has(book.format)) return Promise.resolve(null);
-  const key = coverKey(book);
-  if (!pending.has(key)) {
-    const promise = (async () => {
-      const cached = await cacheGet(key).catch(() => undefined);
-      if (cached !== undefined) return cached.blob;
-      const blob = await enqueue(() => extractCover(book));
-      await cachePut(key, { blob }).catch((e) => console.warn("Couldn't cache cover", e));
-      return blob;
-    })();
-    promise.catch(() => pending.delete(key));
-    pending.set(key, promise);
-  }
-  return pending.get(key);
+export async function getCover(book) {
+  if (!READABLE_FORMATS.has(book.format)) return null;
+  return (await getInfo(book, true)).blob;
+}
+
+/**
+ * Returns the book's { title, author, authorSort } ("" where unknown), reading it in the
+ * background if it isn't cached.
+ */
+export async function getBookMeta(book) {
+  if (!READABLE_FORMATS.has(book.format)) return { title: "", author: "", authorSort: "" };
+  return (await getInfo(book, false)).meta;
 }
