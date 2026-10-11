@@ -35,10 +35,27 @@ There's no Windows version yet.
 
 1. Open the downloaded `.dmg` file.
 2. Drag **Lontar** into the **Applications** folder.
-3. Open Lontar from Applications. The first time, your Mac says it can't check the app for harmful software and won't open it. Click **Done**.
-4. Open **System Settings**, go to **Privacy & Security**, scroll down, and click **Open Anyway** next to the message about Lontar. Confirm with your password.
+3. Open Lontar from Applications. The first time, your Mac shows **"Lontar" Not Opened**, saying Apple could not verify it is free of malware. Click **Done**, not Move to Trash.
+4. Open **System Settings** and go to **Privacy & Security**.
+5. Scroll down to **Security**. Next to the message that Lontar was blocked, click **Open Anyway**.
+6. Enter your password or use Touch ID, then click **Open Anyway** once more.
 
-You only need to do this once. The Mac asks because Lontar isn't registered with Apple, which costs a yearly fee, not because anything is wrong with it.
+From then on, Lontar opens normally. The Mac asks because Lontar isn't registered with Apple, which costs a yearly fee, not because anything is wrong with it. You'll need to do this again each time you download a new version.
+
+If you don't see **Open Anyway**, try opening Lontar again first: the button only appears for about an hour after the Mac blocks the app.
+
+<details>
+<summary>Comfortable with Terminal? There's a shortcut.</summary>
+
+After dragging Lontar into Applications, open the **Terminal** app, paste this line and press Return:
+
+```
+xattr -dr com.apple.quarantine /Applications/Lontar.app
+```
+
+Lontar then opens without the warning.
+
+</details>
 
 ### Linux
 
