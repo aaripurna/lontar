@@ -505,7 +505,7 @@ button {
   gap: 0.5em;
 }
 
-.reader-bar .bookmark-toggle {
+.reader-bar .bar-icon {
   flex: none;
   display: flex;
   padding: 0.4em 0.6em;
@@ -515,12 +515,13 @@ button {
   color: inherit;
 }
 
-.bookmark-toggle svg {
+.bar-icon svg {
   width: 1.5em;
   height: 1.5em;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.75;
+  stroke-linecap: round;
   stroke-linejoin: round;
 }
 
@@ -652,6 +653,48 @@ button {
   border: none;
   box-shadow: none;
   background: transparent;
+  color: inherit;
+}
+
+.reader-search form {
+  position: sticky;
+  top: -1em;
+  margin: -1em -1em 0;
+  padding: 1em 1em 0.5em;
+  background-color: var(--reader-chrome);
+}
+
+.reader-search input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.6em 0.8em;
+  border: 1px solid var(--reader-line);
+  border-radius: 8px;
+  background: var(--reader-bg);
+  color: var(--reader-fg);
+  font: inherit;
+}
+
+.reader-search .search-status {
+  margin: 0.5em 0;
+  font-size: 0.875em;
+  opacity: 0.6;
+}
+
+.reader-search h3 {
+  margin: 1em 0 0.25em;
+  font-size: 0.875em;
+  opacity: 0.7;
+}
+
+.reader-toc .search-result {
+  font-size: 0.9em;
+}
+
+.search-result mark {
+  border-radius: 2px;
+  background: rgba(127, 127, 127, 0.35); /* for WebViews without color-mix (Chrome < 111) */
+  background: color-mix(in srgb, var(--reader-accent) 35%, transparent);
   color: inherit;
 }
 

@@ -135,6 +135,16 @@
   let editing = $derived(highlights.find((h) => h.id === editingId));
   let noteDraft = $state("");
 
+  // Search, kept while the book is open so the results survive jumping to one.
+  const MAX_SEARCH_RESULTS = 1000;
+  let canSearch = $state(false); // the book has text to search (not comics)
+  let searchQuery = $state("");
+  let searchedFor = $state(""); // the query the results are for
+  let searchResults = $state([]); // [{ label, items: [{ cfi, excerpt: { pre, match, post } }] }]
+  let searchCount = $state(0);
+  let searchProgress = $state(null); // 0-1 while searching
+  let searchRun = 0;
+
   const percent = new Intl.NumberFormat(undefined, { style: "percent" });
 
   // Metadata values may be plain strings or { lang: string } maps.
@@ -320,6 +330,47 @@
     persist();
   }
 
+  async function runSearch(event) {
+    event?.preventDefault();
+    const query = searchQuery.trim();
+    const run = ++searchRun;
+    searchedFor = query;
+    searchResults = [];
+    searchCount = 0;
+    if (!query) {
+      view.clearSearch();
+      searchProgress = null;
+      return;
+    }
+    searchProgress = 0;
+    try {
+      for await (const result of view.search({ query })) {
+        if (run !== searchRun) return; // a newer search took over
+        if (result === "done") break;
+        if (result.progress != null) searchProgress = result.progress;
+        if (!result.subitems) continue;
+        // Fixed-layout pages (PDFs) are better known by number than by chapter.
+        const page = reflowable ? null : view.resolveNavigation(result.subitems[0].cfi).index + 1;
+        const label = [page && `Page ${page}`, result.label].filter(Boolean).join(" · ");
+        searchResults = [...searchResults, { label, items: result.subitems }];
+        searchCount += result.subitems.length;
+        if (searchCount >= MAX_SEARCH_RESULTS) break;
+      }
+    } catch (e) {
+      console.warn("Search failed", e);
+    }
+    if (run === searchRun) searchProgress = null;
+  }
+
+  async function goToSearchResult(cfi) {
+    closePanel();
+    await view.goTo(cfi);
+  }
+
+  function focusOnMount(node) {
+    node.focus();
+  }
+
   async function goToBookmark(bookmark) {
     closePanel();
     await view.goTo(bookmark.location);
@@ -429,6 +480,7 @@
     container.append(view);
     await view.open(await openBookFile(file, book.format, { trimMargins: settings.trimMargins }));
     reflowable = view.book.rendition?.layout !== "pre-paginated";
+    canSearch = view.book.sections.some((section) => section.createDocument);
     toc = flattenToc(view.book.toc);
     opened = true; // applies the reading settings
     // Comics have no metadata, and foliate-js falls back to the file name.
@@ -495,9 +547,14 @@
       <span class="title">{title}</span>
       {#if chapter}<span class="chapter">{chapter}</span>{/if}
     </div>
+    {#if canSearch}
+      <button class="bar-icon" aria-label="Search this book" onclick={() => openPanel("search")}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /></svg>
+      </button>
+    {/if}
     {#if canBookmark}
       <button
-        class="bookmark-toggle"
+        class="bar-icon bookmark-toggle"
         class:on={bookmarked}
         aria-pressed={bookmarked}
         aria-label={bookmarked ? "Remove bookmark" : "Bookmark this page"}
@@ -677,6 +734,42 @@
       {:else}
         <p class="empty">No highlights left.</p>
       {/if}
+    </div>
+  {:else if panel === "search"}
+    <div class="reader-sheet reader-toc reader-search" role="dialog" aria-label="Search">
+      <form onsubmit={runSearch}>
+        <input
+          type="search"
+          enterkeyhint="search"
+          placeholder="Search this book"
+          aria-label="Search this book"
+          bind:value={searchQuery}
+          use:focusOnMount
+        />
+      </form>
+      {#if searchProgress != null}
+        <p class="search-status">Searching… {percent.format(searchProgress)}</p>
+      {:else if searchedFor}
+        <p class="search-status">
+          {#if !searchCount}
+            No results for “{searchedFor}”.
+          {:else}
+            {searchCount}{searchCount >= MAX_SEARCH_RESULTS ? "+" : ""} result{searchCount === 1 ? "" : "s"}
+          {/if}
+        </p>
+      {/if}
+      {#each searchResults as group, g (g)}
+        <h3>{group.label}</h3>
+        <ul>
+          {#each group.items as item (item.cfi)}
+            <li>
+              <button class="search-result" onclick={() => goToSearchResult(item.cfi)}>
+                {item.excerpt.pre}<mark>{item.excerpt.match}</mark>{item.excerpt.post}
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/each}
     </div>
   {:else if panel === "highlight" && editing}
     <div class="reader-sheet" role="dialog" aria-label="Highlight">

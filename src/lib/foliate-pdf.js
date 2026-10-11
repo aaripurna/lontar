@@ -9,6 +9,7 @@
 // - optional margin trimming: each page can be shown cropped to its content (see trim.js)
 // - each render builds fresh text and link layers (upstream appends to the old ones), and a
 //   render overtaken by a newer one is discarded
+// - pages have `createDocument`, so foliate-js can search them
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerSrc from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 import viewerCSS from "pdfjs-dist/web/pdf_viewer.css?raw";
@@ -43,12 +44,7 @@ const render = async (page, doc, zoom, crop) => {
   // hold exactly one copy of the page's text, always in the same structure.
   const textDiv = doc.createElement("div");
   textDiv.className = "textLayer";
-  const textLayer = new pdfjsLib.TextLayer({
-    textContentSource: await page.streamTextContent(),
-    container: textDiv,
-    viewport,
-  });
-  await textLayer.render();
+  await buildTextLayer(page, textDiv, viewport);
 
   // hide "offscreen" canvases appended to document when rendering text layer
   // https://github.com/mozilla/pdf.js/blob/642b9a5ae67ef642b9a8808fd9efd447e8c350e2/web/pdf_viewer.css#L51-L58
@@ -64,9 +60,6 @@ const render = async (page, doc, zoom, crop) => {
 
   // fix text selection
   // https://github.com/mozilla/pdf.js/blob/642b9a5ae67ef642b9a8808fd9efd447e8c350e2/web/text_layer_builder.js#L105-L107
-  const endOfContent = doc.createElement("div");
-  endOfContent.className = "endOfContent";
-  textDiv.append(endOfContent);
   textDiv.onpointerdown = () => textDiv.classList.add("selecting");
   textDiv.onpointerup = () => textDiv.classList.remove("selecting");
 
@@ -108,6 +101,32 @@ const findCrop = async (page) => {
   return trimBox(box, width, height);
 };
 
+// The body of each page's document. Search results and highlights are located by their path
+// in it, so the documents made for search (see `pageText`) must have the same structure.
+const PAGE_BODY = `<div id="canvas"></div><div class="textLayer"></div><div class="annotationLayer"></div>`;
+
+// Builds a page's text layer into `div`, as `render` shows it.
+const buildTextLayer = async (page, div, viewport) => {
+  await new pdfjsLib.TextLayer({
+    textContentSource: await page.streamTextContent(),
+    container: div,
+    viewport,
+  }).render();
+  const endOfContent = div.ownerDocument.createElement("div");
+  endOfContent.className = "endOfContent";
+  div.append(endOfContent);
+};
+
+// A document with just the page's text, laid out like the rendered page's, for search.
+const pageText = async (page) => {
+  const doc = new DOMParser().parseFromString(
+    `<!DOCTYPE html><html><body>${PAGE_BODY}</body></html>`,
+    "text/html",
+  );
+  await buildTextLayer(page, doc.querySelector(".textLayer"), page.getViewport({ scale: 1 }));
+  return doc;
+};
+
 const renderPage = async (page, getImageBlob, trim) => {
   const viewport = page.getViewport({ scale: 1 });
   if (getImageBlob) {
@@ -143,9 +162,7 @@ const renderPage = async (page, getImageBlob, trim) => {
         }
         ${viewerCSS}
         </style>
-        <div id="canvas"></div>
-        <div class="textLayer"></div>
-        <div class="annotationLayer"></div>
+        ${PAGE_BODY}
     `,
       ],
       { type: "text/html" },
@@ -212,6 +229,7 @@ export const makePDF = async (file, { trimMargins = false } = {}) => {
       cache.set(key, url);
       return url;
     },
+    createDocument: async () => pageText(await pdf.getPage(i + 1)),
     size: 1000,
   }));
   book.isExternal = (uri) => /^\w+:/i.test(uri);
