@@ -144,6 +144,9 @@
   let searchCount = $state(0);
   let searchProgress = $state(null); // 0-1 while searching
   let searchRun = 0;
+  // Locations of the matches, marked on the page like a text selection. foliate-js marks them
+  // itself with red outlines, which can't be restyled, so those are cleared and these drawn.
+  let searchHits = new Set();
 
   const percent = new Intl.NumberFormat(undefined, { style: "percent" });
 
@@ -337,18 +340,23 @@
     searchedFor = query;
     searchResults = [];
     searchCount = 0;
+    clearSearchHits();
     if (!query) {
-      view.clearSearch();
       searchProgress = null;
       return;
     }
     searchProgress = 0;
     try {
       for await (const result of view.search({ query })) {
+        view.clearSearch(); // foliate-js's outlines; see searchHits
         if (run !== searchRun) return; // a newer search took over
         if (result === "done") break;
         if (result.progress != null) searchProgress = result.progress;
         if (!result.subitems) continue;
+        for (const { cfi } of result.subitems) {
+          searchHits.add(cfi);
+          view.addAnnotation({ value: cfi }).catch(() => {});
+        }
         // Fixed-layout pages (PDFs) are better known by number than by chapter.
         const page = reflowable ? null : view.resolveNavigation(result.subitems[0].cfi).index + 1;
         const label = [page && `Page ${page}`, result.label].filter(Boolean).join(" · ");
@@ -360,6 +368,12 @@
       console.warn("Search failed", e);
     }
     if (run === searchRun) searchProgress = null;
+  }
+
+  function clearSearchHits() {
+    view.clearSearch();
+    for (const cfi of searchHits) view.deleteAnnotation({ value: cfi }).catch(() => {});
+    searchHits = new Set();
   }
 
   async function goToSearchResult(cfi) {
@@ -451,9 +465,14 @@
   // foliate-js asks for highlights to be drawn whenever a chapter is laid out.
   function onCreateOverlay() {
     for (const h of highlights) view.addAnnotation({ value: h.location }).catch(() => {});
+    for (const cfi of searchHits) view.addAnnotation({ value: cfi }).catch(() => {});
   }
 
   function onDrawAnnotation({ detail: { draw, annotation } }) {
+    if (searchHits.has(annotation.value)) {
+      draw(Overlayer.highlight, { color: THEMES[theme].link });
+      return;
+    }
     const highlight = highlights.find((h) => h.location === annotation.value);
     draw(Overlayer.highlight, { color: highlightColor(highlight ?? {}) });
   }
