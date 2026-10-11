@@ -2,8 +2,10 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import "foliate-js/view.js";
+  import { Overlayer } from "foliate-js/overlayer.js";
   import { loadBookData, mergeBookData, saveBookData } from "./lib/sidecar.js";
-  import { activeBookmarks, isOnPage, makeBookmark, removeBookmarks } from "./lib/bookmarks.js";
+  import { activeItems, isOnPage, makeBookmark, removeItems } from "./lib/bookmarks.js";
+  import { HIGHLIGHT_COLORS, highlightColor, makeHighlight, updateItem } from "./lib/annotations.js";
   import { setBarColors } from "./lib/bars.js";
   import { READABLE_FORMATS, openBookFile } from "./lib/formats.js";
 
@@ -123,6 +125,15 @@
   let pageCfi = $state(null); // location of the page on screen
   let bookmarked = $derived(bookmarks.some((b) => isOnPage(b, pageCfi)));
 
+  // Highlights need text to select and foliate-js's overlay, which fixed-layout books lack.
+  let canAnnotate = $derived(canBookmark && reflowable);
+  let highlights = $state([]); // active highlights, in reading order
+  let selection = $state.raw(null); // { doc, index, range, text } while text is selected
+  let selectionTimer;
+  let editingId = $state(null); // the highlight open in the "highlight" panel
+  let editing = $derived(highlights.find((h) => h.id === editingId));
+  let noteDraft = $state("");
+
   const percent = new Intl.NumberFormat(undefined, { style: "percent" });
 
   // Metadata values may be plain strings or { lang: string } maps.
@@ -156,6 +167,7 @@
   }
 
   function onPopState() {
+    if (panel === "highlight") saveNote();
     if (panel) panel = null;
     else onclose();
   }
@@ -189,9 +201,14 @@
 
   // Tapping the outer thirds of the page turns it; the middle third opens the controls.
   // Returns the page-turn function for a tap, or null if the tap should be left alone.
-  function tapAction(target, clientX) {
+  function tapAction(target, clientX, clientY) {
     const doc = target.ownerDocument;
     if (target.closest?.("a") || !doc.getSelection()?.isCollapsed) return null;
+    // A tap on a highlight opens it, wherever on the page it is.
+    const overlayer = view.renderer.getContents?.().find((c) => c.doc === doc)?.overlayer;
+    const [value] = overlayer?.hitTest({ x: clientX, y: clientY }) ?? [];
+    const highlight = value && highlights.find((h) => h.location === value);
+    if (highlight) return () => openHighlight(highlight.id);
     // Map the tap into the reader's coordinates: paginated chapters live in a wide, scrolled
     // iframe, and fixed-layout pages (comics) are scaled with a CSS transform.
     const frame = doc.defaultView.frameElement;
@@ -206,7 +223,7 @@
   }
 
   function onClick(event) {
-    tapAction(event.target, event.clientX)?.();
+    tapAction(event.target, event.clientX, event.clientY)?.();
   }
 
   // foliate-js snaps to the nearest page on every touchend. If a tap also turns the page, the
@@ -226,15 +243,16 @@
     const t = event.changedTouches[0];
     if (!start || event.timeStamp - start.time > 500) return;
     if (Math.hypot(t.screenX - start.x, t.screenY - start.y) > 10) return;
-    const action = tapAction(event.target, t.clientX);
+    const action = tapAction(event.target, t.clientX, t.clientY);
     if (!action) return;
     event.stopPropagation();
     event.preventDefault(); // also suppresses the click, so the page isn't turned twice
     action();
   }
 
-  function onLoad({ detail: { doc } }) {
+  function onLoad({ detail: { doc, index } }) {
     const win = doc.defaultView;
+    doc.addEventListener("selectionchange", () => onSelectionChange(doc, index));
     doc.addEventListener("keydown", onKeydown);
     doc.addEventListener("click", onClick);
     win.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
@@ -273,7 +291,8 @@
         (saved) => {
           // Keep changes made while the write was in flight.
           bookData = mergeBookData(bookData, saved);
-          bookmarks = activeBookmarks(bookData.bookmarks);
+          bookmarks = activeItems(bookData.bookmarks);
+          setHighlights(bookData.annotations ?? []);
           saveError = "";
         },
         (e) => (saveError = String(e)),
@@ -285,24 +304,103 @@
     if (!ready || !bookData || !location?.cfi) return;
     const onPage = bookmarks.filter((b) => isOnPage(b, location.cfi));
     if (onPage.length) {
-      bookData.bookmarks = removeBookmarks(bookData.bookmarks, onPage.map((b) => b.id));
+      bookData.bookmarks = removeItems(bookData.bookmarks, onPage.map((b) => b.id));
     } else {
       const page = reflowable ? null : (location.section?.current ?? 0) + 1;
       bookData.bookmarks = [...(bookData.bookmarks ?? []), makeBookmark(location, page)];
     }
-    bookmarks = activeBookmarks(bookData.bookmarks);
+    bookmarks = activeItems(bookData.bookmarks);
     persist();
   }
 
   function removeBookmark(id) {
-    bookData.bookmarks = removeBookmarks(bookData.bookmarks, [id]);
-    bookmarks = activeBookmarks(bookData.bookmarks);
+    bookData.bookmarks = removeItems(bookData.bookmarks, [id]);
+    bookmarks = activeItems(bookData.bookmarks);
     persist();
   }
 
   async function goToBookmark(bookmark) {
     closePanel();
     await view.goTo(bookmark.location);
+  }
+
+  // Selecting text shows the highlight toolbar; it waits for the selection to settle, since
+  // dragging the selection handles fires a stream of changes.
+  function onSelectionChange(doc, index) {
+    clearTimeout(selectionTimer);
+    selectionTimer = setTimeout(() => {
+      const sel = doc.getSelection();
+      const range = sel?.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0) : null;
+      if (canAnnotate && range?.toString().trim()) {
+        selection = { doc, index, range: range.cloneRange(), text: range.toString() };
+      } else if (selection?.doc === doc) {
+        selection = null;
+      }
+    }, 250);
+  }
+
+  function setHighlights(annotations) {
+    bookData.annotations = annotations;
+    highlights = activeItems(annotations).filter((a) => a.text != null);
+  }
+
+  function createHighlight(color, withNote = false) {
+    const { doc, index, range, text } = selection;
+    const location = view.getCFI(index, range);
+    const highlight = makeHighlight(location, text, color, {
+      fraction: view.lastLocation?.fraction,
+      label: view.lastLocation?.tocItem?.label,
+    });
+    setHighlights([...(bookData.annotations ?? []), highlight]);
+    doc.getSelection()?.removeAllRanges();
+    selection = null;
+    view.addAnnotation({ value: location });
+    persist();
+    if (withNote) openHighlight(highlight.id);
+  }
+
+  function openHighlight(id) {
+    editingId = id;
+    noteDraft = highlights.find((h) => h.id === id)?.note ?? "";
+    openPanel("highlight");
+  }
+
+  function setHighlightColor(color) {
+    if (!editing || editing.color === color) return;
+    setHighlights(updateItem(bookData.annotations, editing.id, { color }));
+    view.addAnnotation({ value: editing.location }); // redraws it
+    persist();
+  }
+
+  function saveNote() {
+    const note = noteDraft.trim();
+    if (!editing || note === (editing.note ?? "")) return;
+    setHighlights(updateItem(bookData.annotations, editing.id, { note: note || undefined }));
+    persist();
+  }
+
+  function removeHighlight(id) {
+    const highlight = highlights.find((h) => h.id === id);
+    if (!highlight) return;
+    if (editingId === id) editingId = null;
+    setHighlights(removeItems(bookData.annotations, [id]));
+    view.deleteAnnotation({ value: highlight.location });
+    persist();
+  }
+
+  async function goToHighlight(highlight) {
+    closePanel();
+    await view.goTo(highlight.location);
+  }
+
+  // foliate-js asks for highlights to be drawn whenever a chapter is laid out.
+  function onCreateOverlay() {
+    for (const h of highlights) view.addAnnotation({ value: h.location }).catch(() => {});
+  }
+
+  function onDrawAnnotation({ detail: { draw, annotation } }) {
+    const highlight = highlights.find((h) => h.location === annotation.value);
+    draw(Overlayer.highlight, { color: highlightColor(highlight ?? {}) });
   }
 
   // Android may kill a backgrounded app without warning, so save as soon as it's hidden.
@@ -322,6 +420,8 @@
     view = document.createElement("foliate-view");
     view.addEventListener("load", onLoad);
     view.addEventListener("relocate", onRelocate);
+    view.addEventListener("create-overlay", onCreateOverlay);
+    view.addEventListener("draw-annotation", onDrawAnnotation);
     container.append(view);
     await view.open(await openBookFile(file, book.format, { trimMargins: settings.trimMargins }));
     reflowable = view.book.rendition?.layout !== "pre-paginated";
@@ -335,7 +435,8 @@
       bookData = (await loadBookData(book)) ?? {};
       // Merging sync-conflict copies may have changed it since the scan.
       if (bookData.progress) onprogress?.(book, bookData.progress);
-      bookmarks = activeBookmarks(bookData.bookmarks);
+      bookmarks = activeItems(bookData.bookmarks);
+      setHighlights(bookData.annotations ?? []);
     } catch (e) {
       saveError = `Couldn't read saved progress: ${e}`;
     }
@@ -416,6 +517,15 @@
     {#if saveError}<span class="save-error" title={saveError}>· progress not saved</span>{/if}
   </footer>
 
+  {#if selection && !panel}
+    <div class="highlight-toolbar" role="toolbar" aria-label="Highlight selection">
+      {#each Object.entries(HIGHLIGHT_COLORS) as [name, color]}
+        <button class="swatch" style:background={color} aria-label="Highlight in {name}" onclick={() => createHighlight(name)}></button>
+      {/each}
+      <button class="toolbar-note" onclick={() => createHighlight("yellow", true)}>Note</button>
+    </div>
+  {/if}
+
   {#if panel}
     <button class="reader-backdrop" aria-label="Close" onclick={closePanel}></button>
   {/if}
@@ -444,6 +554,11 @@
         <button class="sheet-button" onclick={() => (panel = "bookmarks")} disabled={!bookmarks.length}>
           Bookmarks{bookmarks.length ? ` (${bookmarks.length})` : ""}
         </button>
+        {#if canAnnotate}
+          <button class="sheet-button" onclick={() => (panel = "highlights")} disabled={!highlights.length}>
+            Highlights{highlights.length ? ` (${highlights.length})` : ""}
+          </button>
+        {/if}
       </div>
 
       {#if reflowable}
@@ -520,7 +635,7 @@
       {#if bookmarks.length}
         <ul>
           {#each bookmarks as bookmark (bookmark.id)}
-            <li class="bookmark">
+            <li class="list-item">
               <button class:current={isOnPage(bookmark, pageCfi)} onclick={() => goToBookmark(bookmark)}>
                 <span class="bookmark-label">
                   {bookmark.label || "Bookmark"}
@@ -535,6 +650,52 @@
       {:else}
         <p class="empty">No bookmarks left.</p>
       {/if}
+    </div>
+  {:else if panel === "highlights"}
+    <div class="reader-sheet reader-toc" role="dialog" aria-label="Highlights">
+      <h2>Highlights</h2>
+      {#if highlights.length}
+        <ul>
+          {#each highlights as highlight (highlight.id)}
+            <li class="list-item">
+              <button onclick={() => goToHighlight(highlight)}>
+                <span class="bookmark-label">
+                  {highlight.label || "Highlight"}
+                  {#if highlight.fraction != null}<span class="bookmark-percent">{percent.format(highlight.fraction)}</span>{/if}
+                </span>
+                <span class="highlight-text" style:border-color={highlightColor(highlight)}>{highlight.text}</span>
+                {#if highlight.note}<span class="highlight-note">{highlight.note}</span>{/if}
+              </button>
+              <button class="bookmark-remove" onclick={() => removeHighlight(highlight.id)} aria-label="Remove highlight">×</button>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="empty">No highlights left.</p>
+      {/if}
+    </div>
+  {:else if panel === "highlight" && editing}
+    <div class="reader-sheet" role="dialog" aria-label="Highlight">
+      <p class="highlight-text highlight-quote" style:border-color={highlightColor(editing)}>{editing.text}</p>
+      <div class="sheet-row">
+        <span class="sheet-label">Colour</span>
+        <div class="swatches">
+          {#each Object.entries(HIGHLIGHT_COLORS) as [name, color]}
+            <button
+              class="swatch"
+              style:background={color}
+              aria-pressed={editing.color === name}
+              aria-label={name}
+              onclick={() => setHighlightColor(name)}
+            ></button>
+          {/each}
+        </div>
+      </div>
+      <textarea class="highlight-note-input" rows="3" placeholder="Add a note" bind:value={noteDraft} onblur={saveNote}></textarea>
+      <div class="sheet-buttons">
+        <button class="sheet-button" onclick={() => { removeHighlight(editing.id); closePanel(); }}>Delete</button>
+        <button class="sheet-button" onclick={closePanel}>Done</button>
+      </div>
     </div>
   {/if}
 </div>

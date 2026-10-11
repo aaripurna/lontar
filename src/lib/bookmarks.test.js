@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { activeBookmarks, isOnPage, makeBookmark, removeBookmarks } from "./bookmarks.js";
+import { activeItems, isOnPage, makeBookmark, removeItems } from "./bookmarks.js";
 
 // A page spanning offsets 0-30 of the text node at /4/2/1 in the second spine item.
 const PAGE = "epubcfi(/6/4!/4/2,/1:0,/1:30)";
@@ -33,23 +33,32 @@ describe("makeBookmark", () => {
   });
 });
 
-describe("removeBookmarks", () => {
-  test("leaves a tombstone that activeBookmarks hides", () => {
+describe("removeItems", () => {
+  test("leaves a tombstone that activeItems hides", () => {
     const list = [
       { id: "a", location: "epubcfi(/6/4!/4/2/1:5)", createdAt: "2026-01-01T00:00:00.000Z" },
       { id: "b", location: "epubcfi(/6/2!/4/2/1:5)", createdAt: "2026-01-01T00:00:00.000Z" },
     ];
-    const removed = removeBookmarks(list, ["a"]);
+    const removed = removeItems(list, ["a"]);
     expect(removed.find((b) => b.id === "a")).toMatchObject({ deleted: true });
     expect(removed.find((b) => b.id === "a").updatedAt > list[0].createdAt).toBe(true);
-    expect(activeBookmarks(removed).map((b) => b.id)).toEqual(["b"]);
+    expect(activeItems(removed).map((b) => b.id)).toEqual(["b"]);
   });
 
-  test("activeBookmarks sorts by position in the book", () => {
+  test("activeItems skips items without a location", () => {
+    const list = [
+      { id: "a", location: "epubcfi(/6/4!/4/2/1:5)" },
+      { id: "odd", range: "epubcfi(/6/10)" },
+      { id: "b", location: "epubcfi(/6/2!/4/2/1:5)" },
+    ];
+    expect(activeItems(list).map((b) => b.id)).toEqual(["b", "a"]);
+  });
+
+  test("activeItems sorts by position in the book", () => {
     const list = [
       { id: "late", location: "epubcfi(/6/4!/4/2/1:5)" },
       { id: "early", location: "epubcfi(/6/2!/4/2/1:5)" },
     ];
-    expect(activeBookmarks(list).map((b) => b.id)).toEqual(["early", "late"]);
+    expect(activeItems(list).map((b) => b.id)).toEqual(["early", "late"]);
   });
 });

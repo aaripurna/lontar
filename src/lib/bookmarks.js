@@ -7,13 +7,16 @@ import { collapse, compare } from "foliate-js/epubcfi.js";
 
 const EXCERPT_LENGTH = 120;
 
-function newId() {
+export function newId() {
   return globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-/** Bookmarks that haven't been removed, in reading order. */
-export function activeBookmarks(bookmarks = []) {
-  return bookmarks.filter((b) => !b.deleted).sort((a, b) => compare(a.location, b.location));
+/**
+ * Bookmarks or annotations that haven't been removed, in reading order. Items without a
+ * location (e.g. written by another app or a future version) are left out.
+ */
+export function activeItems(items = []) {
+  return items.filter((b) => !b.deleted && b.location).sort((a, b) => compare(a.location, b.location));
 }
 
 /** Whether `bookmark` falls on the page whose location (a range CFI) is `pageCfi`. */
@@ -38,8 +41,8 @@ export function makeBookmark(location, page) {
   };
 }
 
-/** Marks the given bookmarks as removed, so a sync merge can't bring them back. */
-export function removeBookmarks(bookmarks = [], ids) {
+/** Marks the given bookmarks or annotations as removed, so a sync merge can't bring them back. */
+export function removeItems(items = [], ids) {
   const now = new Date().toISOString();
-  return bookmarks.map((b) => (ids.includes(b.id) ? { id: b.id, createdAt: b.createdAt, updatedAt: now, deleted: true } : b));
+  return items.map((b) => (ids.includes(b.id) ? { id: b.id, createdAt: b.createdAt, updatedAt: now, deleted: true } : b));
 }

@@ -529,12 +529,12 @@ button {
   stroke: var(--reader-accent);
 }
 
-.reader-toc li.bookmark {
+.reader-toc li.list-item {
   display: flex;
   align-items: flex-start;
 }
 
-.reader-toc li.bookmark button:first-child {
+.reader-toc li.list-item button:first-child {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -575,6 +575,97 @@ button {
 
 .reader-toc .empty {
   opacity: 0.6;
+}
+
+.reader .sheet-buttons {
+  flex-wrap: wrap;
+}
+
+.reader .sheet-buttons .sheet-button {
+  flex: 1 1 auto;
+  width: auto;
+}
+
+.highlight-text {
+  border-left: 4px solid;
+  padding-left: 0.6em;
+  font-weight: 400;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.highlight-quote {
+  margin: 0 0 1em;
+  -webkit-line-clamp: 5;
+}
+
+.highlight-note {
+  font-size: 0.875em;
+  font-style: italic;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.highlight-toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: 3.5em;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.5em 0.75em;
+  border-radius: 999px;
+  background: var(--reader-chrome);
+  color: var(--reader-fg);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.reader .swatch {
+  width: 2em;
+  height: 2em;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  box-shadow: none;
+}
+
+.reader .swatch[aria-pressed="true"] {
+  border-color: var(--reader-fg);
+}
+
+/* touch screens keep the hover border after a tap */
+.reader .swatch:not([aria-pressed="true"]) {
+  border-color: transparent;
+}
+
+.swatches {
+  display: flex;
+  gap: 0.6em;
+}
+
+.highlight-toolbar .toolbar-note {
+  padding: 0.3em 0.8em;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  color: inherit;
+}
+
+.highlight-note-input {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0.5em 0 1em;
+  padding: 0.6em;
+  border: 1px solid var(--reader-line);
+  border-radius: 8px;
+  background: var(--reader-bg);
+  color: var(--reader-fg);
+  font: inherit;
+  resize: vertical;
 }
 
 @media (prefers-color-scheme: dark) {
