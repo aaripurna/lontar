@@ -74,6 +74,11 @@ struct CopyBookResponse {
 }
 
 #[derive(Serialize)]
+struct KeepScreenOnArgs {
+    on: bool,
+}
+
+#[derive(Serialize)]
 struct BarColorsArgs<'a> {
     color: &'a str,
     dark: bool,
@@ -177,6 +182,15 @@ impl<R: Runtime> Library<R> {
         self.0
             .run_mobile_plugin::<OpenedBooksResponse>("takeOpenedBooks", ())
             .map(|r| r.books)
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn set_keep_screen_on(&self, on: bool) -> Result<(), String> {
+        if cfg!(target_os = "ios") {
+            return Ok(()); // the frontend's wake lock covers iOS
+        }
+        self.0
+            .run_mobile_plugin::<()>("setKeepScreenOn", KeepScreenOnArgs { on })
             .map_err(|e| e.to_string())
     }
 

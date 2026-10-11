@@ -35,6 +35,11 @@ class BookArgs {
 }
 
 @InvokeArg
+class KeepScreenOnArgs {
+  var on: Boolean = false
+}
+
+@InvokeArg
 class BarColorsArgs {
   lateinit var color: String
   var dark: Boolean = false
@@ -418,6 +423,17 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.reject(e.message ?: "Failed to delete ${args.sidecarName}")
       }
     }.start()
+  }
+
+  // Kept on while a book is open, so the screen doesn't dim and lock mid-page.
+  @Command
+  fun setKeepScreenOn(invoke: Invoke) {
+    val args = invoke.parseArgs(KeepScreenOnArgs::class.java)
+    activity.runOnUiThread {
+      val flag = android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+      if (args.on) activity.window.addFlags(flag) else activity.window.clearFlags(flag)
+      invoke.resolve()
+    }
   }
 
   // What Back does at the app's root on Android 12+: the app goes to the background, still

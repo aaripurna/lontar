@@ -9,6 +9,7 @@
   import { HIGHLIGHT_COLORS, highlightColor, makeHighlight, updateItem } from "./lib/annotations.js";
   import { setBarColors } from "./lib/bars.js";
   import { READABLE_FORMATS, openBookFile } from "./lib/formats.js";
+  import { keepScreenOn } from "./lib/awake.js";
 
   // `book` is an entry from the `plugin:library|scan` result.
   // `onprogress(book, progress)` is called whenever the reading progress changes.
@@ -572,6 +573,7 @@
     const onSchemeChange = (e) => (systemDark = e.matches);
     darkQuery.addEventListener("change", onSchemeChange);
     document.addEventListener("visibilitychange", onVisibilityChange);
+    const releaseScreen = keepScreenOn(); // no dimming mid-page
 
     open()
       .catch((e) => (error = e?.message ?? String(e)))
@@ -582,6 +584,7 @@
       document.removeEventListener("keydown", onKeydown);
       darkQuery.removeEventListener("change", onSchemeChange);
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      releaseScreen();
       saveProgress();
       view?.close();
       view?.book?.destroy?.();

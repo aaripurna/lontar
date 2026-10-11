@@ -17,6 +17,7 @@ Allows picking library folders, scanning them for ebooks, opening books, and rea
 - `allow-take-opened-books`
 - `allow-move-to-background`
 - `allow-hide-splash`
+- `allow-set-keep-screen-on`
 
 ## Permission Table
 
@@ -309,6 +310,32 @@ Enables the set_bar_colors command without any pre-configured scope.
 <td>
 
 Denies the set_bar_colors command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:allow-set-keep-screen-on`
+
+</td>
+<td>
+
+Enables the set_keep_screen_on command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:deny-set-keep-screen-on`
+
+</td>
+<td>
+
+Denies the set_keep_screen_on command without any pre-configured scope.
 
 </td>
 </tr>

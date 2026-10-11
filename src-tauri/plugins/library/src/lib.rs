@@ -351,6 +351,19 @@ fn take_opened_books<R: Runtime>(app: AppHandle<R>) -> Result<Vec<Ebook>, String
     app.state::<Library<R>>().take_opened_books()
 }
 
+/// Keeps the screen from dimming and locking while a book is open (Android). Elsewhere the
+/// frontend uses the web view's Screen Wake Lock API instead.
+#[tauri::command]
+fn set_keep_screen_on<R: Runtime>(app: AppHandle<R>, on: bool) -> Result<(), String> {
+    #[cfg(desktop)]
+    return {
+        let _ = (app, on);
+        Ok(())
+    };
+    #[cfg(mobile)]
+    app.state::<Library<R>>().set_keep_screen_on(on)
+}
+
 /// Lets the Android launch screen go, once the frontend has drawn. A no-op elsewhere.
 #[tauri::command]
 fn hide_splash<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
@@ -408,7 +421,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             set_bar_colors,
             take_opened_books,
             move_to_background,
-            hide_splash
+            hide_splash,
+            set_keep_screen_on
         ])
         .setup(|app, api| {
             #[cfg(desktop)]

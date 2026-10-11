@@ -12,6 +12,7 @@ const COMMANDS: &[&str] = &[
     "take_opened_books",
     "move_to_background",
     "hide_splash",
+    "set_keep_screen_on",
 ];
 
 fn main() {
