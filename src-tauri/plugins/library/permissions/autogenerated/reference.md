@@ -15,6 +15,7 @@ Allows picking library folders, scanning them for ebooks, opening books, and rea
 - `allow-delete-sidecar`
 - `allow-set-bar-colors`
 - `allow-take-opened-books`
+- `allow-move-to-background`
 
 ## Permission Table
 
@@ -73,6 +74,32 @@ Enables the delete_sidecar_conflict command without any pre-configured scope.
 <td>
 
 Denies the delete_sidecar_conflict command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:allow-move-to-background`
+
+</td>
+<td>
+
+Enables the move_to_background command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:deny-move-to-background`
+
+</td>
+<td>
+
+Denies the move_to_background command without any pre-configured scope.
 
 </td>
 </tr>

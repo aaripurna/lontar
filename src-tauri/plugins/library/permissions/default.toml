@@ -12,4 +12,5 @@ permissions = [
   "allow-delete-sidecar",
   "allow-set-bar-colors",
   "allow-take-opened-books",
+  "allow-move-to-background",
 ]

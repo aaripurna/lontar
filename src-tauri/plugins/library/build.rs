@@ -10,6 +10,7 @@ const COMMANDS: &[&str] = &[
     "delete_sidecar",
     "set_bar_colors",
     "take_opened_books",
+    "move_to_background",
 ];
 
 fn main() {

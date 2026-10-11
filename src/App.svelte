@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
+  import { onBackButtonPress } from "@tauri-apps/api/app";
   import Reader from "./Reader.svelte";
   import Cover from "./Cover.svelte";
   import { getBookMeta, pauseBackground, pruneCovers } from "./lib/covers.js";
@@ -259,6 +260,14 @@
     });
     const onVisible = () => document.visibilityState === "visible" && openedBook();
     document.addEventListener("visibilitychange", onVisible);
+    // Android's Back would otherwise go through the web view's own history, which skips the
+    // entries added without a tap (a book sent from another app opens that way) and so can close
+    // the book or leave the app from inside a panel. Every page and panel here has its own
+    // history entry with a state, so Back steps through those, and only leaves from the library.
+    const backButton = onBackButtonPress(() => {
+      if (history.state) history.back();
+      else invoke("plugin:library|move_to_background").catch((e) => console.warn(e));
+    }).catch(() => null); // desktop has no Back button
     const onSchemeChange = (e) => (systemDark = e.matches);
     darkQuery.addEventListener("change", onSchemeChange);
     window.addEventListener("popstate", onPopState);
@@ -267,6 +276,7 @@
       window.removeEventListener("popstate", onPopState);
       unlisten.then((unlisten) => unlisten());
       document.removeEventListener("visibilitychange", onVisible);
+      backButton.then((listener) => listener?.unregister());
     };
   });
 </script>

@@ -351,6 +351,19 @@ fn take_opened_books<R: Runtime>(app: AppHandle<R>) -> Result<Vec<Ebook>, String
     app.state::<Library<R>>().take_opened_books()
 }
 
+/// Sends the app to the background, as Android's Back does at an app's root. The frontend
+/// handles Back itself, so it calls this when there's nothing left to go back to. Android only.
+#[tauri::command]
+fn move_to_background<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    #[cfg(desktop)]
+    return {
+        let _ = app;
+        Ok(())
+    };
+    #[cfg(mobile)]
+    app.state::<Library<R>>().move_to_background()
+}
+
 /// Colours the area behind the system status and navigation bars, and picks light or dark
 /// icons for them. Only Android needs this; elsewhere the app draws behind the bars itself.
 #[tauri::command]
@@ -381,7 +394,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             delete_sidecar_conflict,
             delete_sidecar,
             set_bar_colors,
-            take_opened_books
+            take_opened_books,
+            move_to_background
         ])
         .setup(|app, api| {
             #[cfg(desktop)]

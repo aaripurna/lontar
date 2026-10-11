@@ -180,6 +180,15 @@ impl<R: Runtime> Library<R> {
             .map_err(|e| e.to_string())
     }
 
+    pub fn move_to_background(&self) -> Result<(), String> {
+        if cfg!(target_os = "ios") {
+            return Ok(()); // iOS has no Back button
+        }
+        self.0
+            .run_mobile_plugin::<()>("moveToBackground", ())
+            .map_err(|e| e.to_string())
+    }
+
     pub fn set_bar_colors(&self, color: &str, dark: bool) -> Result<(), String> {
         // On iOS the web view already extends behind the status bar and home indicator.
         if cfg!(target_os = "ios") {

@@ -405,6 +405,16 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
     }.start()
   }
 
+  // What Back does at the app's root on Android 12+: the app goes to the background, still
+  // running. The frontend handles Back itself (see App.svelte), so it asks for this.
+  @Command
+  fun moveToBackground(invoke: Invoke) {
+    activity.runOnUiThread {
+      activity.moveTaskToBack(true)
+      invoke.resolve()
+    }
+  }
+
   // The app draws edge-to-edge, with MainActivity padding the content view clear of the system
   // bars, so that padding is what shows behind them.
   @Command

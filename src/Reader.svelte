@@ -563,8 +563,10 @@
   }
 
   onMount(() => {
-    // A book opened from the OS replaces the one being read; it reuses that reader's entry.
-    if (!history.state?.reader) history.pushState({ reader: true }, "");
+    // A book opened from the OS replaces the one being read and takes over its history entry
+    // (its panel's, if one was open).
+    if (history.state?.reader || history.state?.readerPanel) history.replaceState({ reader: true }, "");
+    else history.pushState({ reader: true }, "");
     window.addEventListener("popstate", onPopState);
     document.addEventListener("keydown", onKeydown);
     const onSchemeChange = (e) => (systemDark = e.matches);
