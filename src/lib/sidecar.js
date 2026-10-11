@@ -101,7 +101,14 @@ export async function loadBookData(book) {
   return data;
 }
 
-/** Saves the book's data, replacing any existing sidecar. */
+/**
+ * Saves the book's data, merged with the sidecar currently on disk (which sync may have updated
+ * from another device since it was read), and returns the merged result.
+ */
 export async function saveBookData(book, data) {
-  await write(book, data);
+  const ref = sidecarRef(book);
+  const contents = await invoke("plugin:library|read_sidecar", { book: ref });
+  const merged = mergeBookData(data, contents == null ? null : parse(contents, book.fileName + ".lontar"));
+  await write(book, merged);
+  return merged;
 }

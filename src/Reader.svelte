@@ -2,7 +2,8 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import "foliate-js/view.js";
-  import { loadBookData, saveBookData } from "./lib/sidecar.js";
+  import { loadBookData, mergeBookData, saveBookData } from "./lib/sidecar.js";
+  import { activeBookmarks, isOnPage, makeBookmark, removeBookmarks } from "./lib/bookmarks.js";
   import { setBarColors } from "./lib/bars.js";
   import { READABLE_FORMATS, openBookFile } from "./lib/formats.js";
 
@@ -114,7 +115,13 @@
   let savedLocation = null;
   let pendingProgress = null;
   let saveTimer;
+  let saving = Promise.resolve(); // sidecar writes, one at a time
   let saveError = $state("");
+
+  let canBookmark = $state(false); // the sidecar was read, so bookmarks can be saved
+  let bookmarks = $state([]); // active bookmarks, in reading order
+  let pageCfi = $state(null); // location of the page on screen
+  let bookmarked = $derived(bookmarks.some((b) => isOnPage(b, pageCfi)));
 
   const percent = new Intl.NumberFormat(undefined, { style: "percent" });
 
@@ -238,6 +245,7 @@
     fraction = detail.fraction;
     chapter = detail.tocItem?.label ?? "";
     currentHref = detail.tocItem?.href ?? null;
+    pageCfi = detail.cfi ?? null;
     if (!ready || !bookData || !detail.cfi || detail.cfi === savedLocation) return;
     pendingProgress = { location: detail.cfi, fraction: detail.fraction };
     // Page turns come in bursts; write once the reader settles.
@@ -253,10 +261,48 @@
     savedLocation = progress.location;
     bookData = { ...bookData, progress };
     onprogress?.(book, progress);
-    saveBookData(book, bookData).then(
-      () => (saveError = ""),
-      (e) => (saveError = String(e)),
-    );
+    persist();
+  }
+
+  // Writes `bookData` to the sidecar, picking up whatever sync brought in meanwhile.
+  function persist() {
+    const data = bookData;
+    saving = saving
+      .then(() => saveBookData(book, data))
+      .then(
+        (saved) => {
+          // Keep changes made while the write was in flight.
+          bookData = mergeBookData(bookData, saved);
+          bookmarks = activeBookmarks(bookData.bookmarks);
+          saveError = "";
+        },
+        (e) => (saveError = String(e)),
+      );
+  }
+
+  function toggleBookmark() {
+    const location = view?.lastLocation;
+    if (!ready || !bookData || !location?.cfi) return;
+    const onPage = bookmarks.filter((b) => isOnPage(b, location.cfi));
+    if (onPage.length) {
+      bookData.bookmarks = removeBookmarks(bookData.bookmarks, onPage.map((b) => b.id));
+    } else {
+      const page = reflowable ? null : (location.section?.current ?? 0) + 1;
+      bookData.bookmarks = [...(bookData.bookmarks ?? []), makeBookmark(location, page)];
+    }
+    bookmarks = activeBookmarks(bookData.bookmarks);
+    persist();
+  }
+
+  function removeBookmark(id) {
+    bookData.bookmarks = removeBookmarks(bookData.bookmarks, [id]);
+    bookmarks = activeBookmarks(bookData.bookmarks);
+    persist();
+  }
+
+  async function goToBookmark(bookmark) {
+    closePanel();
+    await view.goTo(bookmark.location);
   }
 
   // Android may kill a backgrounded app without warning, so save as soon as it's hidden.
@@ -289,6 +335,7 @@
       bookData = (await loadBookData(book)) ?? {};
       // Merging sync-conflict copies may have changed it since the scan.
       if (bookData.progress) onprogress?.(book, bookData.progress);
+      bookmarks = activeBookmarks(bookData.bookmarks);
     } catch (e) {
       saveError = `Couldn't read saved progress: ${e}`;
     }
@@ -303,6 +350,7 @@
     // Only moving away from where the book opened counts as progress.
     savedLocation = view.lastLocation?.cfi ?? lastLocation ?? null;
     ready = true;
+    canBookmark = !!bookData;
   }
 
   // The system back button (Android) and the header's back button both pop this entry.
@@ -342,6 +390,17 @@
       <span class="title">{title}</span>
       {#if chapter}<span class="chapter">{chapter}</span>{/if}
     </div>
+    {#if canBookmark}
+      <button
+        class="bookmark-toggle"
+        class:on={bookmarked}
+        aria-pressed={bookmarked}
+        aria-label={bookmarked ? "Remove bookmark" : "Bookmark this page"}
+        onclick={toggleBookmark}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z" /></svg>
+      </button>
+    {/if}
   </header>
 
   <div class="reader-page" bind:this={container}>
@@ -378,9 +437,14 @@
         <span class="sheet-value">{percent.format(sliderValue ?? fraction ?? 0)}</span>
       </div>
 
-      <button class="sheet-button" onclick={() => (panel = "toc")} disabled={!toc.length}>
-        Contents
-      </button>
+      <div class="sheet-buttons">
+        <button class="sheet-button" onclick={() => (panel = "toc")} disabled={!toc.length}>
+          Contents
+        </button>
+        <button class="sheet-button" onclick={() => (panel = "bookmarks")} disabled={!bookmarks.length}>
+          Bookmarks{bookmarks.length ? ` (${bookmarks.length})` : ""}
+        </button>
+      </div>
 
       {#if reflowable}
         <div class="sheet-row">
@@ -449,6 +513,28 @@
           </li>
         {/each}
       </ul>
+    </div>
+  {:else if panel === "bookmarks"}
+    <div class="reader-sheet reader-toc" role="dialog" aria-label="Bookmarks">
+      <h2>Bookmarks</h2>
+      {#if bookmarks.length}
+        <ul>
+          {#each bookmarks as bookmark (bookmark.id)}
+            <li class="bookmark">
+              <button class:current={isOnPage(bookmark, pageCfi)} onclick={() => goToBookmark(bookmark)}>
+                <span class="bookmark-label">
+                  {bookmark.label || "Bookmark"}
+                  {#if bookmark.fraction != null}<span class="bookmark-percent">{percent.format(bookmark.fraction)}</span>{/if}
+                </span>
+                {#if bookmark.excerpt}<span class="bookmark-excerpt">{bookmark.excerpt}</span>{/if}
+              </button>
+              <button class="bookmark-remove" onclick={() => removeBookmark(bookmark.id)} aria-label="Remove bookmark">×</button>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="empty">No bookmarks left.</p>
+      {/if}
     </div>
   {/if}
 </div>

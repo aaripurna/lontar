@@ -500,6 +500,83 @@ button {
   font-weight: 600;
 }
 
+.reader .sheet-buttons {
+  display: flex;
+  gap: 0.5em;
+}
+
+.reader-bar .bookmark-toggle {
+  flex: none;
+  display: flex;
+  padding: 0.4em 0.6em;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  color: inherit;
+}
+
+.bookmark-toggle svg {
+  width: 1.5em;
+  height: 1.5em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+}
+
+.bookmark-toggle.on svg {
+  fill: var(--reader-accent);
+  stroke: var(--reader-accent);
+}
+
+.reader-toc li.bookmark {
+  display: flex;
+  align-items: flex-start;
+}
+
+.reader-toc li.bookmark button:first-child {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+}
+
+.bookmark-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 1em;
+}
+
+.bookmark-percent,
+.bookmark-excerpt {
+  opacity: 0.6;
+  font-size: 0.875em;
+  font-weight: 400;
+}
+
+.bookmark-excerpt {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.reader-toc .bookmark-remove {
+  flex: none;
+  width: auto;
+  padding: 0.4em 0.75em;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  font-size: 1.25em;
+  opacity: 0.6;
+}
+
+.reader-toc .empty {
+  opacity: 0.6;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
