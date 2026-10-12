@@ -20,7 +20,7 @@ Go to the [download page](https://github.com/aaripurna/lontar/releases/latest) a
 | Android phone or tablet | the file ending in `.apk` |
 | Windows | the file ending in `-setup.exe` |
 | Mac | the file ending in `.dmg` |
-| Linux | the file ending in `.flatpak` or `.deb` |
+| Linux | the file ending in `.flatpak`, `.deb` or `.rpm` |
 | iPhone or iPad | the file ending in `.ipa` (see the note below) |
 
 ### Android
@@ -69,6 +69,7 @@ Lontar then opens without the warning.
 
 - **Flatpak** (works on most Linux systems): double-click the `.flatpak` file to install it with your Software app.
 - **`.deb`** (Ubuntu, Debian, Linux Mint and similar): double-click the file and choose **Install**.
+- **`.rpm`** (Fedora, openSUSE and similar): double-click the file and choose **Install**. Or open a terminal in the folder with the file and run `sudo dnf install ./lontar-*.rpm`.
 
 ### iPhone and iPad
 
@@ -111,7 +112,7 @@ bun run tauri android dev    # Android emulator or device
 bun test src                 # tests
 ```
 
-To release, push a version tag such as `v1.2.0`. CI uses the tag as the app version, so the `version` in `src-tauri/tauri.conf.json` only applies to local builds. CI builds a signed Android APK, an unsigned Windows installer, a universal macOS DMG, an unsigned iOS IPA, a Linux `.deb` and a Flatpak bundle, and attaches them to the GitHub release. The DMG is only Developer ID signed and notarized when the `APPLE_*` secrets are set (see `.github/workflows/release.yml`).
+To release, push a version tag such as `v1.2.0`. CI uses the tag as the app version, so the `version` in `src-tauri/tauri.conf.json` only applies to local builds. CI builds a signed Android APK, an unsigned Windows installer, a universal macOS DMG, an unsigned iOS IPA, a Linux `.deb` and `.rpm` and a Flatpak bundle, and attaches them to the GitHub release. The DMG is only Developer ID signed and notarized when the `APPLE_*` secrets are set (see `.github/workflows/release.yml`).
 
 ## License
 

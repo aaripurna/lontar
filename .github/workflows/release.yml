@@ -186,7 +186,7 @@ jobs:
         with:
           files: lontar-${{ github.ref_name }}-ios-unsigned.ipa
 
-  linux-deb:
+  linux:
     # Oldest supported Ubuntu, so the binary links against an old glibc and runs on more distros.
     runs-on: ubuntu-22.04
     steps:
@@ -219,11 +219,13 @@ jobs:
             flatpak/io.github.aaripurna.Lontar.metainfo.xml
           grep '<release ' flatpak/io.github.aaripurna.Lontar.metainfo.xml
 
-      - name: Build .deb
-        run: bun run tauri build --bundles deb
+      - name: Build .deb and .rpm
+        run: bun run tauri build --bundles deb,rpm
 
-      - name: Collect .deb
-        run: cp src-tauri/target/release/bundle/deb/*.deb "lontar-${GITHUB_REF_NAME}-amd64.deb"
+      - name: Collect packages
+        run: |
+          cp src-tauri/target/release/bundle/deb/*.deb "lontar-${GITHUB_REF_NAME}-amd64.deb"
+          cp src-tauri/target/release/bundle/rpm/*.rpm "lontar-${GITHUB_REF_NAME}-x86_64.rpm"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -232,10 +234,12 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: lontar-${{ github.ref_name }}-amd64.deb
+          files: |
+            lontar-${{ github.ref_name }}-amd64.deb
+            lontar-${{ github.ref_name }}-x86_64.rpm
 
   flatpak:
-    needs: linux-deb
+    needs: linux
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
