@@ -34,6 +34,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "category": "Productivity",
+    "shortDescription": "Read your ebooks and keep your place on every device",
+    "longDescription": "A simple ebook reader for EPUB, PDF, Kindle, FB2 and comic book files. It remembers where you stopped in every book, and keeps your place, bookmarks and highlights in a small file next to each book, so a synced folder carries them to your other devices.",
     "macOS": {
       "signingIdentity": "-"
     },
@@ -93,6 +96,13 @@
         "role": "Viewer",
         "mimeType": "application/vnd.comicbook+zip"
       }
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/share/metainfo/io.github.aaripurna.Lontar.metainfo.xml": "../flatpak/io.github.aaripurna.Lontar.metainfo.xml"
+        }
+      }
+    }
   }
 }

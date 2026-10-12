@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.aaripurna.Lontar</id>
+  <launchable type="desktop-id">io.github.aaripurna.Lontar.desktop</launchable>
+  <name>Lontar</name>
+  <summary>Read your ebooks and keep your place on every device</summary>
+  <developer id="io.github.aaripurna">
+    <name>Nawa Aripurna</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>
+      Lontar is a simple ebook reader. Point it at the folders where you keep your books, and it
+      shows them as a library you can read from. It remembers where you stopped in every book.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Reads EPUB, PDF, Kindle (MOBI, AZW, AZW3), FB2 and comic book (CBZ) files</li>
+      <li>Bookmarks, highlights and notes</li>
+      <li>Search inside a book, or search your library by title or author</li>
+      <li>Adjustable text size and line spacing, with light, sepia and dark pages</li>
+      <li>Opens ebooks straight from your file manager</li>
+    </ul>
+    <p>
+      Your reading place, bookmarks and highlights are kept in a small file next to each book, so
+      a folder synced with a tool such as Syncthing carries them to your other devices. Lontar is
+      also available for Android, macOS, Windows and iOS.
+    </p>
+    <p>Books with copy protection (DRM) can't be opened.</p>
+  </description>
+  <url type="homepage">https://github.com/aaripurna/lontar</url>
+  <url type="bugtracker">https://github.com/aaripurna/lontar/issues</url>
+  <url type="vcs-browser">https://github.com/aaripurna/lontar</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Your library</caption>
+      <image>https://raw.githubusercontent.com/aaripurna/lontar/main/flatpak/screenshots/library.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Reading a book</caption>
+      <image>https://raw.githubusercontent.com/aaripurna/lontar/main/flatpak/screenshots/reader.png</image>
+    </screenshot>
+  </screenshots>
+  <branding>
+    <color type="primary" scheme_preference="light">#f6f6f6</color>
+    <color type="primary" scheme_preference="dark">#2f2f2f</color>
+  </branding>
+  <categories>
+    <category>Office</category>
+    <category>Viewer</category>
+  </categories>
+  <keywords>
+    <keyword>ebook</keyword>
+    <keyword>epub</keyword>
+    <keyword>reader</keyword>
+    <keyword>books</keyword>
+  </keywords>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <releases>
+    <release version="0.1.0" date="2026-10-08"/>
+  </releases>
+</component>

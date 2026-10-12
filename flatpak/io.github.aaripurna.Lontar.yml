@@ -1,0 +1,31 @@
+# Repackages the .deb produced by `bun run tauri build --bundles deb`, for the .flatpak attached
+# to GitHub releases. CI copies the .deb to flatpak/lontar.deb before running flatpak-builder.
+# flathub/io.github.aaripurna.Lontar.yml is the same, downloading the .deb from a release; keep
+# their build-commands in step.
+id: io.github.aaripurna.Lontar
+runtime: org.gnome.Platform
+runtime-version: "51"
+sdk: org.gnome.Sdk
+command: lontar
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --share=ipc
+modules:
+  - name: lontar
+    buildsystem: simple
+    sources:
+      - type: file
+        path: lontar.deb
+    build-commands:
+      - ar -x lontar.deb
+      - tar -xf data.tar.*
+      - install -Dm755 usr/bin/lontar /app/bin/lontar
+      - desktop-file-edit --set-icon=$FLATPAK_ID usr/share/applications/Lontar.desktop
+      - install -Dm644 usr/share/applications/Lontar.desktop /app/share/applications/$FLATPAK_ID.desktop
+      - |
+        for size in 32x32 128x128 256x256@2; do
+          install -Dm644 usr/share/icons/hicolor/$size/apps/lontar.png /app/share/icons/hicolor/$size/apps/$FLATPAK_ID.png
+        done
+      - install -Dm644 usr/share/metainfo/$FLATPAK_ID.metainfo.xml /app/share/metainfo/$FLATPAK_ID.metainfo.xml

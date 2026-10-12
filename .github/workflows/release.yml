@@ -212,6 +212,13 @@ jobs:
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
 
+      # The .deb carries the app store metadata that Flathub shows, with this release in it.
+      - name: Add the release to the app store metadata
+        run: |
+          sed -i "s|<release version=\"[^\"]*\" date=\"[^\"]*\"|<release version=\"${GITHUB_REF_NAME#v}\" date=\"$(date -u +%F)\"|" \
+            flatpak/io.github.aaripurna.Lontar.metainfo.xml
+          grep '<release ' flatpak/io.github.aaripurna.Lontar.metainfo.xml
+
       - name: Build .deb
         run: bun run tauri build --bundles deb
 
@@ -243,16 +250,10 @@ jobs:
       - name: Stage .deb for the manifest
         run: mv lontar-*.deb flatpak/lontar.deb
 
-      - name: Use the tag as the release version
-        run: |
-          sed -i "s|<release version=\"[^\"]*\" date=\"[^\"]*\"|<release version=\"${GITHUB_REF_NAME#v}\" date=\"$(date -u +%F)\"|" \
-            flatpak/com.nawa.lontar.metainfo.xml
-          grep '<release ' flatpak/com.nawa.lontar.metainfo.xml
-
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: lontar-${{ github.ref_name }}-x86_64.flatpak
-          manifest-path: flatpak/com.nawa.lontar.yml
+          manifest-path: flatpak/io.github.aaripurna.Lontar.yml
           cache-key: flatpak-builder-${{ github.sha }}
 
       - uses: softprops/action-gh-release@v2
