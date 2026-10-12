@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "updater",
+  "description": "Installing new versions, where the app updates itself",
+  "windows": [
+    "main"
+  ],
+  "platforms": [
+    "macOS",
+    "windows"
+  ],
+  "permissions": [
+    "updater:default",
+    "process:allow-restart"
+  ]
+}

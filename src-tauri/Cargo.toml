@@ -32,6 +32,11 @@ tauri-plugin-dialog = "2"
 [target.'cfg(any(windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2"
 
+# Auto-update, for the Windows installer and the macOS app; other builds show a notice instead.
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

@@ -75,6 +75,15 @@ Lontar then opens without the warning.
 
 Lontar isn't in the App Store. To install the `.ipa` file you need a sideloading tool such as AltStore, SideStore or Sideloadly. This takes some setup, so ask a tech-savvy friend if you're unsure.
 
+### Updates
+
+When a new version comes out, Lontar shows a notice at the top of your library.
+
+- **Windows and Mac:** click **Update**. Lontar downloads the new version, installs it and restarts.
+- **Android, Linux and iPhone:** tap **Download** to get the new version, then install it the same way as the first time.
+
+To check, Lontar asks GitHub for the latest version each time it starts. That is the only time it goes online; your books and reading data never leave your devices.
+
 ## Getting started
 
 1. Open Lontar and tap **Add folder**.
@@ -112,7 +121,7 @@ bun run tauri android dev    # Android emulator or device
 bun test src                 # tests
 ```
 
-To release, push a version tag such as `v1.2.0`. CI uses the tag as the app version, so the `version` in `src-tauri/tauri.conf.json` only applies to local builds. CI builds a signed Android APK, an unsigned Windows installer, a universal macOS DMG, an unsigned iOS IPA, a Linux `.deb` and `.rpm` and a Flatpak bundle, and attaches them to the GitHub release. The DMG is only Developer ID signed and notarized when the `APPLE_*` secrets are set (see `.github/workflows/release.yml`).
+To release, push a version tag such as `v1.2.0`. CI uses the tag as the app version, so the `version` in `src-tauri/tauri.conf.json` only applies to local builds. CI builds a signed Android APK, an unsigned Windows installer, a universal macOS DMG, an unsigned iOS IPA, a Linux `.deb` and `.rpm` and a Flatpak bundle, and attaches them to the GitHub release. The Windows installer and the macOS app are also signed for the in-app updater when the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets are set, and the release gets the `latest.json` the apps check. The DMG is only Developer ID signed and notarized when the `APPLE_*` secrets are set (see `.github/workflows/release.yml`).
 
 ## License
 

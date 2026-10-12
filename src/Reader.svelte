@@ -753,9 +753,10 @@
         {#each toc as item, i (i)}
           <li>
             <button
-              class:current={item.href === currentHref}
+              class:current={item.href && item.href === currentHref}
               style:padding-left="{0.75 + item.depth}em"
-              use:scrollIntoViewIf={item.href === currentHref}
+              use:scrollIntoViewIf={item.href && item.href === currentHref}
+              disabled={!item.href}
               onclick={() => goToTocItem(item.href)}
             >
               {item.label}

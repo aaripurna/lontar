@@ -10,6 +10,8 @@
   import { reattachSidecar, saveBookData, scannedProgress } from "./lib/sidecar.js";
   import { computeBookId, matchOrphans, reattachCandidates } from "./lib/bookid.js";
   import { setBarColors } from "./lib/bars.js";
+  import { findUpdate } from "./lib/updates.js";
+  import { openUrl } from "@tauri-apps/plugin-opener";
 
   const FOLDERS_KEY = "lontar.libraryFolders";
   // The last scan's books and progress, shown at once on launch while the folders are scanned
@@ -20,6 +22,12 @@
   // Device-local on purpose: these ids mean nothing on another device.
   let folders = $state(loadFolders());
   let version = $state("");
+  // A newer release ({ version, install } or { version, url }, see updates.js), once found.
+  let update = $state(null);
+  let updating = $state(false);
+  let updateError = $state("");
+  const DISMISSED_UPDATE_KEY = "lontar.dismissedUpdate";
+  let dismissedUpdate = $state(loadDismissedUpdate());
   const saved = loadLibrary(folders);
   let books = $state(saved.books);
   // folder id -> why it couldn't be scanned
@@ -99,6 +107,42 @@
     } catch (e) {
       console.warn("Couldn't remember the library", e);
     }
+  }
+
+  function loadDismissedUpdate() {
+    try {
+      return localStorage.getItem(DISMISSED_UPDATE_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  // Development builds carry the version in tauri.conf.json, so every release looks newer.
+  function checkForUpdate(current) {
+    if (import.meta.env.DEV) return;
+    findUpdate(current).then(
+      (found) => (update = found),
+      (e) => console.warn("Couldn't check for a new version", e),
+    );
+  }
+
+  async function installUpdate() {
+    updating = true;
+    updateError = "";
+    try {
+      await update.install(); // restarts the app when done
+    } catch (e) {
+      updateError = `Couldn't update: ${e}`;
+      updating = false;
+    }
+  }
+
+  // Hides the notice until an even newer version comes out.
+  function dismissUpdate() {
+    dismissedUpdate = update.version;
+    try {
+      localStorage.setItem(DISMISSED_UPDATE_KEY, update.version);
+    } catch {}
   }
 
   function saveFolders() {
@@ -277,7 +321,13 @@
     );
     loadBookInfo(books); // titles for the remembered books, from the cover cache
     firstScan = refresh();
-    getVersion().then((v) => (version = v), (e) => console.warn("Couldn't read the app version", e));
+    getVersion().then(
+      (v) => {
+        version = v;
+        checkForUpdate(v);
+      },
+      (e) => console.warn("Couldn't read the app version", e),
+    );
     // Listen first, then take what arrived before, so no opened book is missed. Android has no
     // event; a book sent from another app brings lontar back to the foreground instead.
     const openedBook = () => takeOpenedBooks().catch((e) => console.warn("Couldn't open the book", e));
@@ -363,6 +413,22 @@
         <button class="header-button" onclick={openFolders}>Folders</button>
       {/if}
     </header>
+
+    {#if update && update.version !== dismissedUpdate}
+      <div class="update">
+        <span class="update-text">
+          {updateError || (updating ? `Updating to Lontar ${update.version}…` : `Lontar ${update.version} is available.`)}
+        </span>
+        {#if update.install}
+          <button onclick={installUpdate} disabled={updating}>Update</button>
+        {:else}
+          <button onclick={() => openUrl(update.url)}>Download</button>
+        {/if}
+        <button class="dismiss" onclick={dismissUpdate} disabled={updating} aria-label="Not now" title="Not now"
+          >×</button
+        >
+      </div>
+    {/if}
 
     {#if failedFolders}
       <button class="notice" onclick={openFolders}>

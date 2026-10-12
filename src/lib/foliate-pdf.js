@@ -247,9 +247,10 @@ const renderPage = async (page, getImageBlob, trim, pages) => {
   return { src, onZoom };
 };
 
+// An outline entry can be a heading with no destination of its own; it gets no href.
 const makeTOCItem = (item) => ({
   label: item.title,
-  href: JSON.stringify(item.dest),
+  href: item.dest ? JSON.stringify(item.dest) : null,
   subitems: item.items.length ? item.items.map(makeTOCItem) : null,
 });
 
@@ -309,17 +310,28 @@ export const makePDF = async (file, { trimMargins = false } = {}) => {
   }));
   const pages = makePrerenderer(pdf, book.sections);
   book.isExternal = (uri) => /^\w+:/i.test(uri);
-  book.resolveHref = async (href) => {
-    const parsed = JSON.parse(href);
+  // The page a destination leads to, or null for an entry without one, or a named destination
+  // the PDF doesn't define.
+  const pageIndex = async (href) => {
+    const parsed = href ? JSON.parse(href) : null;
     const dest = typeof parsed === "string" ? await pdf.getDestination(parsed) : parsed;
-    const index = await pdf.getPageIndex(dest[0]);
+    return Array.isArray(dest) ? await pdf.getPageIndex(dest[0]) : null;
+  };
+  book.resolveHref = async (href) => {
+    const index = await pageIndex(href);
+    if (index == null) throw new Error(`${href} doesn't lead to a page`);
     return { index };
   };
+  // Called for every contents entry when the book opens, so a broken one is skipped rather
+  // than failing the whole book.
   book.splitTOCHref = async (href) => {
-    const parsed = JSON.parse(href);
-    const dest = typeof parsed === "string" ? await pdf.getDestination(parsed) : parsed;
-    const index = await pdf.getPageIndex(dest[0]);
-    return [index, null];
+    try {
+      const index = await pageIndex(href);
+      return index == null ? null : [index, null];
+    } catch (e) {
+      console.warn(`Contents entry ${href} doesn't lead to a page`, e);
+      return null;
+    }
   };
   book.getTOCFragment = (doc) => doc.documentElement;
   book.getCover = async () => renderPage(await pdf.getPage(1), true);

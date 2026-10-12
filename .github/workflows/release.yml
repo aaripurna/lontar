@@ -103,17 +103,41 @@ jobs:
             echo "__EOF__" >> "$GITHUB_ENV"
           done
 
+      # With the updater key, the build also makes Lontar.app.tar.gz and its signature, which
+      # the installed app downloads and checks when it updates itself.
       - name: Build DMG
-        run: bun run tauri build --target universal-apple-darwin --bundles dmg
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            bun run tauri build --target universal-apple-darwin --bundles app,dmg \
+              --config '{"bundle":{"createUpdaterArtifacts":true}}'
+          else
+            echo "No updater key; the DMG is built without an update package."
+            bun run tauri build --target universal-apple-darwin --bundles dmg
+          fi
 
       - name: Collect DMG
         run: |
-          cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg \
-             "lontar-${GITHUB_REF_NAME}-macos-universal.dmg"
+          bundle=src-tauri/target/universal-apple-darwin/release/bundle
+          cp $bundle/dmg/*.dmg "lontar-${GITHUB_REF_NAME}-macos-universal.dmg"
+          if [ -f $bundle/macos/Lontar.app.tar.gz.sig ]; then
+            cp $bundle/macos/Lontar.app.tar.gz "lontar-${GITHUB_REF_NAME}-macos-universal.app.tar.gz"
+            mkdir -p updater && cp $bundle/macos/Lontar.app.tar.gz.sig updater/macos.sig
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: updater-macos
+          path: updater/
+          if-no-files-found: ignore
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: lontar-${{ github.ref_name }}-macos-universal.dmg
+          files: |
+            lontar-${{ github.ref_name }}-macos-universal.dmg
+            lontar-${{ github.ref_name }}-macos-universal.app.tar.gz
 
   windows-installer:
     # Unsigned NSIS setup .exe. It installs per user (no admin needed) and fetches WebView2 if
@@ -137,12 +161,35 @@ jobs:
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
 
+      # With the updater key, the build also signs the installer, which the installed app checks
+      # before running it to update itself.
       - name: Build installer
-        run: bun run tauri build --bundles nsis
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            bun run tauri build --bundles nsis --config '{"bundle":{"createUpdaterArtifacts":true}}'
+          else
+            echo "No updater key; the installer is built without an update signature."
+            bun run tauri build --bundles nsis
+          fi
 
       - name: Collect installer
         shell: bash
-        run: cp src-tauri/target/release/bundle/nsis/*-setup.exe "lontar-${GITHUB_REF_NAME}-windows-x64-setup.exe"
+        run: |
+          nsis=src-tauri/target/release/bundle/nsis
+          cp $nsis/*-setup.exe "lontar-${GITHUB_REF_NAME}-windows-x64-setup.exe"
+          if ls $nsis/*-setup.exe.sig > /dev/null 2>&1; then
+            mkdir -p updater && cp $nsis/*-setup.exe.sig updater/windows.sig
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: updater-windows
+          path: updater/
+          if-no-files-found: ignore
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -263,3 +310,41 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: lontar-${{ github.ref_name }}-x86_64.flatpak
+
+  updater:
+    # latest.json, which the Windows and macOS apps check for a new version (src/lib/updates.js).
+    needs: [macos-dmg, windows-installer]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        # Missing when the updater key isn't set up; the next step then skips.
+        continue-on-error: true
+        with:
+          pattern: updater-*
+          merge-multiple: true
+          path: updater
+
+      - name: Write latest.json
+        run: |
+          if [ ! -f updater/macos.sig ] || [ ! -f updater/windows.sig ]; then
+            echo "No update signatures (TAURI_SIGNING_PRIVATE_KEY isn't set); no latest.json."
+            exit 0
+          fi
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          jq -n \
+            --arg version "${GITHUB_REF_NAME#v}" \
+            --arg date "$(date -u +%FT%TZ)" \
+            --arg mac_sig "$(cat updater/macos.sig)" \
+            --arg mac_url "$base/lontar-${GITHUB_REF_NAME}-macos-universal.app.tar.gz" \
+            --arg win_sig "$(cat updater/windows.sig)" \
+            --arg win_url "$base/lontar-${GITHUB_REF_NAME}-windows-x64-setup.exe" \
+            '{version: $version, pub_date: $date, platforms: {
+              "darwin-aarch64": {signature: $mac_sig, url: $mac_url},
+              "darwin-x86_64": {signature: $mac_sig, url: $mac_url},
+              "windows-x86_64": {signature: $win_sig, url: $win_url}
+            }}' > latest.json
+          cat latest.json
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: latest.json

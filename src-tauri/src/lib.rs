@@ -1,3 +1,14 @@
+/// How this build gets new versions: "install" where the updater can install them (the Windows
+/// installer and the macOS app), "notify" elsewhere, where the library links to the download.
+#[tauri::command]
+fn update_method() -> &'static str {
+    if cfg!(any(windows, target_os = "macos")) {
+        "install"
+    } else {
+        "notify"
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default();
@@ -17,10 +28,15 @@ pub fn run() {
     // The library plugin uses the dialog plugin's folder picker on desktop.
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_dialog::init());
+    #[cfg(any(windows, target_os = "macos"))]
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
     builder
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_library::init())
         .plugin(tauri_plugin_opener::init())
+        .invoke_handler(tauri::generate_handler![update_method])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
