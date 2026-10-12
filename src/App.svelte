@@ -12,8 +12,6 @@
   import { setBarColors } from "./lib/bars.js";
 
   const FOLDERS_KEY = "lontar.libraryFolders";
-  // Older builds saved a single folder under this key.
-  const LEGACY_FOLDER_KEY = "lontar.libraryFolder";
 
   // [{ id, name }]: id is a path on desktop and an opaque access token on Android/iOS.
   // Device-local on purpose: these ids mean nothing on another device.
@@ -72,10 +70,7 @@
 
   function loadFolders() {
     try {
-      const saved = JSON.parse(localStorage.getItem(FOLDERS_KEY));
-      if (saved) return saved;
-      const legacy = JSON.parse(localStorage.getItem(LEGACY_FOLDER_KEY));
-      return legacy ? [legacy] : [];
+      return JSON.parse(localStorage.getItem(FOLDERS_KEY)) ?? [];
     } catch {
       return [];
     }
@@ -84,7 +79,6 @@
   function saveFolders() {
     try {
       localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
-      localStorage.removeItem(LEGACY_FOLDER_KEY);
     } catch {}
   }
 
