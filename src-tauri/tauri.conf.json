@@ -113,5 +113,16 @@
         }
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZGNjM2MEM3NERCMDQxQzgKUldUSVFiQk54MkJqLytvTlRiOFJ0ajVOY0o5Qk5FTG5ERzJ3cUhiREhlcWkySlprODN5ZnRwRmoK",
+      "endpoints": [
+        "https://github.com/aaripurna/lontar/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
