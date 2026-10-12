@@ -12,12 +12,16 @@
   import { setBarColors } from "./lib/bars.js";
 
   const FOLDERS_KEY = "lontar.libraryFolders";
+  // The last scan's books and progress, shown at once on launch while the folders are scanned
+  // again, which can take a while for a big library on Android.
+  const LIBRARY_KEY = "lontar.library";
 
   // [{ id, name }]: id is a path on desktop and an opaque access token on Android/iOS.
   // Device-local on purpose: these ids mean nothing on another device.
   let folders = $state(loadFolders());
   let version = $state("");
-  let books = $state([]);
+  const saved = loadLibrary(folders);
+  let books = $state(saved.books);
   // folder id -> why it couldn't be scanned
   let folderErrors = $state({});
   let loading = $state(false);
@@ -28,7 +32,7 @@
   let page = $state("books");
   let failedFolders = $derived(folders.filter((f) => folderErrors[f.id]).length);
   // book path -> reading progress ({ fraction, updatedAt, ... }) from its sidecar
-  let progress = $state({});
+  let progress = $state(saved.progress);
 
   // book path -> { title, author, authorSort } from the book's metadata, filled in as books
   // are read in the background (see covers.js); until then a book goes by its file name.
@@ -76,6 +80,27 @@
     }
   }
 
+  // Only books from folders still in the library; the rest were removed since.
+  function loadLibrary(folders) {
+    try {
+      const { books, progress } = JSON.parse(localStorage.getItem(LIBRARY_KEY));
+      const ids = new Set(folders.map((f) => f.id));
+      const kept = books.filter((b) => ids.has(b.folderId));
+      const keptProgress = kept.map((b) => [b.path, progress[b.path]]).filter(([, p]) => p);
+      return { books: kept, progress: Object.fromEntries(keptProgress) };
+    } catch {
+      return { books: [], progress: {} };
+    }
+  }
+
+  function saveLibrary() {
+    try {
+      localStorage.setItem(LIBRARY_KEY, JSON.stringify({ books, progress }));
+    } catch (e) {
+      console.warn("Couldn't remember the library", e);
+    }
+  }
+
   function saveFolders() {
     try {
       localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders));
@@ -97,6 +122,7 @@
       );
       // The sidecar text was only needed for the progress.
       books = result.books.map(({ sidecar, ...book }) => book);
+      saveLibrary();
       // With a folder missing, its covers would be dropped and remade later, so wait.
       if (!result.errors.length) pruneCovers(books).catch((e) => console.warn(e));
       loadBookInfo(books);
@@ -249,6 +275,7 @@
     requestAnimationFrame(() =>
       invoke("plugin:library|hide_splash").catch((e) => console.warn("Couldn't hide the launch screen", e)),
     );
+    loadBookInfo(books); // titles for the remembered books, from the cover cache
     firstScan = refresh();
     getVersion().then((v) => (version = v), (e) => console.warn("Couldn't read the app version", e));
     // Listen first, then take what arrived before, so no opened book is missed. Android has no
@@ -414,7 +441,10 @@
   {#key reading.path}
     <Reader
       book={reading}
-      onclose={() => (reading = null)}
+      onclose={() => {
+        reading = null;
+        saveLibrary(); // with the progress just made
+      }}
       onprogress={(book, p) => (progress[book.path] = p)}
     />
   {/key}

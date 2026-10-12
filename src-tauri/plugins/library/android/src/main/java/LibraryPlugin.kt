@@ -17,6 +17,9 @@ import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSArray
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorCompletionService
+import java.util.concurrent.Executors
 
 private val EBOOK_EXTENSIONS = setOf(
   "epub", "pdf", "mobi", "azw", "azw3", "kf8", "kfx", "fb2", "djvu", "cbz", "cbr", "cb7"
@@ -64,6 +67,9 @@ class SidecarArgs {
 }
 
 private const val SIDECAR_SUFFIX = ".lontar"
+
+// Folders listed and sidecars read at once while scanning.
+private const val SCAN_THREADS = 8
 
 private const val EXTERNAL_STORAGE = "com.android.externalstorage.documents"
 
@@ -476,9 +482,45 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
     return null
   }
 
-  // Lists the ebooks under `parentId` into `books`, and into `orphans` the sidecars whose book
-  // is gone (renamed or moved), which the frontend may reattach.
-  private fun collectEbooks(treeUri: Uri, parentId: String, books: JSArray, orphans: JSArray) {
+  // One step of walking a library folder: the books and orphaned sidecars it found, and the
+  // steps it led to (subfolders to list, sidecars to read).
+  private class ScanStep(
+    val books: List<JSObject> = emptyList(),
+    val orphans: List<JSObject> = emptyList(),
+    val next: List<() -> ScanStep> = emptyList(),
+  )
+
+  // Lists the ebooks under `rootId` into `books`, and into `orphans` the sidecars whose book is
+  // gone (renamed or moved), which the frontend may reattach. Listing a folder and reading a
+  // sidecar are each a round trip to the storage provider, so they're done several at a time;
+  // one by one, a library of 1000 books in 400 folders took ~10 s.
+  private fun collectEbooks(treeUri: Uri, rootId: String, books: JSArray, orphans: JSArray) {
+    val pool = Executors.newFixedThreadPool(SCAN_THREADS)
+    try {
+      val steps = ExecutorCompletionService<ScanStep>(pool)
+      var pending = 0
+      fun start(step: () -> ScanStep) {
+        steps.submit(step)
+        pending++
+      }
+      start { listFolder(treeUri, rootId) }
+      while (pending > 0) {
+        val step = try {
+          steps.take().get()
+        } catch (e: ExecutionException) {
+          throw e.cause ?: e // e.g. a SecurityException, for the caller to report
+        }
+        pending--
+        step.books.forEach { books.put(it) }
+        step.orphans.forEach { orphans.put(it) }
+        step.next.forEach(::start)
+      }
+    } finally {
+      pool.shutdownNow()
+    }
+  }
+
+  private fun listFolder(treeUri: Uri, parentId: String): ScanStep {
     val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
     val columns = arrayOf(
       Document.COLUMN_DOCUMENT_ID,
@@ -524,12 +566,19 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
     } catch (e: Exception) {
       null // leave it out; opening the book reports the problem
     }
+    val ready = mutableListOf<JSObject>()
+    val next = mutableListOf<() -> ScanStep>()
     // Attach each book's sidecar, so the library can show progress without a read per book.
     for (book in found) {
-      sidecars.remove(book.getString("fileName") + SIDECAR_SUFFIX)?.let { docId ->
-        readText(docId)?.let { book.put("sidecar", it) }
+      val docId = sidecars.remove(book.getString("fileName") + SIDECAR_SUFFIX)
+      if (docId == null) {
+        ready.add(book)
+      } else {
+        next.add {
+          readText(docId)?.let { book.put("sidecar", it) }
+          ScanStep(books = listOf(book))
+        }
       }
-      books.put(book)
     }
     // What's left are sidecars without their book. Conflict copies aren't sidecars.
     for ((name, docId) in sidecars) {
@@ -537,11 +586,15 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
       if (bookName.contains(".sync-conflict-")) continue
       val format = bookName.substringAfterLast('.', "").lowercase()
       if (format !in EBOOK_EXTENSIONS) continue
-      val contents = readText(docId) ?: continue
-      orphans.put(JSObject().put("dir", parentId).put("fileName", bookName).put("contents", contents))
+      next.add {
+        val contents = readText(docId)
+        val orphan = contents?.let { JSObject().put("dir", parentId).put("fileName", bookName).put("contents", it) }
+        ScanStep(orphans = listOfNotNull(orphan))
+      }
     }
     for (dir in subdirs) {
-      collectEbooks(treeUri, dir, books, orphans)
+      next.add { listFolder(treeUri, dir) }
     }
+    return ScanStep(ready, emptyList(), next)
   }
 }
