@@ -1,7 +1,5 @@
 # Repackages the .deb produced by `bun run tauri build --bundles deb`, for the .flatpak attached
 # to GitHub releases. CI copies the .deb to flatpak/lontar.deb before running flatpak-builder.
-# flathub/io.github.aaripurna.Lontar.yml is the same, downloading the .deb from a release; keep
-# their build-commands in step.
 id: io.github.aaripurna.Lontar
 runtime: org.gnome.Platform
 runtime-version: "51"
