@@ -111,7 +111,7 @@ bun run tauri android dev    # Android emulator or device
 bun test src                 # tests
 ```
 
-To release, bump `version` in `src-tauri/tauri.conf.json` and push a `v*` tag. CI builds a signed Android APK, an unsigned Windows installer, a universal macOS DMG, an unsigned iOS IPA, a Linux `.deb` and a Flatpak bundle, and attaches them to the GitHub release. The DMG is only Developer ID signed and notarized when the `APPLE_*` secrets are set (see `.github/workflows/release.yml`).
+To release, push a version tag such as `v1.2.0`. CI uses the tag as the app version, so the `version` in `src-tauri/tauri.conf.json` only applies to local builds. CI builds a signed Android APK, an unsigned Windows installer, a universal macOS DMG, an unsigned iOS IPA, a Linux `.deb` and a Flatpak bundle, and attaches them to the GitHub release. The DMG is only Developer ID signed and notarized when the `APPLE_*` secrets are set (see `.github/workflows/release.yml`).
 
 ## License
 

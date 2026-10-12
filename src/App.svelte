@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { onBackButtonPress } from "@tauri-apps/api/app";
+  import { getVersion, onBackButtonPress } from "@tauri-apps/api/app";
   import Reader from "./Reader.svelte";
   import Cover from "./Cover.svelte";
   import { getBookMeta, pauseBackground, pruneCovers } from "./lib/covers.js";
@@ -18,6 +18,7 @@
   // [{ id, name }]: id is a path on desktop and an opaque access token on Android/iOS.
   // Device-local on purpose: these ids mean nothing on another device.
   let folders = $state(loadFolders());
+  let version = $state("");
   let books = $state([]);
   // folder id -> why it couldn't be scanned
   let folderErrors = $state({});
@@ -255,6 +256,7 @@
       invoke("plugin:library|hide_splash").catch((e) => console.warn("Couldn't hide the launch screen", e)),
     );
     firstScan = refresh();
+    getVersion().then((v) => (version = v), (e) => console.warn("Couldn't read the app version", e));
     // Listen first, then take what arrived before, so no opened book is missed. Android has no
     // event; a book sent from another app brings lontar back to the foreground instead.
     const openedBook = () => takeOpenedBooks().catch((e) => console.warn("Couldn't open the book", e));
@@ -326,6 +328,10 @@
         {/each}
       </ul>
       <p class="status">{loading ? "Scanning…" : `${books.length} ${books.length === 1 ? "book" : "books"} found`}</p>
+    {/if}
+
+    {#if version}
+      <p class="app-version">Lontar {version}</p>
     {/if}
   </main>
 {:else}

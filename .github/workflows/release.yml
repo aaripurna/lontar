@@ -14,6 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Use the tag as the app version
+        shell: bash
+        run: node scripts/set-version.mjs "$GITHUB_REF_NAME"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -63,6 +67,10 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Use the tag as the app version
+        shell: bash
+        run: node scripts/set-version.mjs "$GITHUB_REF_NAME"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -114,6 +122,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Use the tag as the app version
+        shell: bash
+        run: node scripts/set-version.mjs "$GITHUB_REF_NAME"
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
@@ -141,6 +153,10 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Use the tag as the app version
+        shell: bash
+        run: node scripts/set-version.mjs "$GITHUB_REF_NAME"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -175,6 +191,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+
+      - name: Use the tag as the app version
+        shell: bash
+        run: node scripts/set-version.mjs "$GITHUB_REF_NAME"
 
       - name: Install Linux dependencies
         run: |
@@ -222,6 +242,12 @@ jobs:
 
       - name: Stage .deb for the manifest
         run: mv lontar-*.deb flatpak/lontar.deb
+
+      - name: Use the tag as the release version
+        run: |
+          sed -i "s|<release version=\"[^\"]*\" date=\"[^\"]*\"|<release version=\"${GITHUB_REF_NAME#v}\" date=\"$(date -u +%F)\"|" \
+            flatpak/com.nawa.lontar.metainfo.xml
+          grep '<release ' flatpak/com.nawa.lontar.metainfo.xml
 
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
