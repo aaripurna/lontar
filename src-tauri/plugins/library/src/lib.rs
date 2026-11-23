@@ -389,6 +389,38 @@ fn move_to_background<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     app.state::<Library<R>>().move_to_background()
 }
 
+/// Where Android updates may be downloaded from: this project's GitHub releases.
+const RELEASE_DOWNLOADS: &str = "https://github.com/aaripurna/lontar/releases/download/";
+
+/// Downloads the APK at `url`, checks it against `sha256` (lowercase hex) and installs it over
+/// the app, which Android then restarts. Android only; the frontend uses Tauri's updater on
+/// Windows and macOS.
+#[tauri::command]
+async fn install_update<R: Runtime>(
+    app: AppHandle<R>,
+    url: String,
+    sha256: String,
+) -> Result<(), String> {
+    if !url.starts_with(RELEASE_DOWNLOADS) || !url.ends_with(".apk") {
+        return Err(format!("Not a Lontar release APK: {url}"));
+    }
+    if sha256.len() != 64 || !sha256.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+        return Err(format!("Not a SHA-256: {sha256}"));
+    }
+    #[cfg(desktop)]
+    return {
+        let _ = app;
+        Err("Only Android installs APKs".into())
+    };
+    #[cfg(mobile)]
+    {
+        let library = app.state::<Library<R>>().inner().clone();
+        tauri::async_runtime::spawn_blocking(move || library.install_update(&url, &sha256))
+            .await
+            .map_err(|e| e.to_string())?
+    }
+}
+
 /// Colours the area behind the system status and navigation bars, and picks light or dark
 /// icons for them. Only Android needs this; elsewhere the app draws behind the bars itself.
 #[tauri::command]
@@ -422,7 +454,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             take_opened_books,
             move_to_background,
             hide_splash,
-            set_keep_screen_on
+            set_keep_screen_on,
+            install_update
         ])
         .setup(|app, api| {
             #[cfg(desktop)]

@@ -1,6 +1,8 @@
 // Looks for a newer release of Lontar. The Windows installer and the macOS app install it with
-// Tauri's updater (from latest.json on the latest GitHub release, signed by CI); other builds
-// can't replace themselves, so they get a link to download it instead.
+// Tauri's updater (from latest.json on the latest GitHub release, signed by CI). Android
+// downloads the release's APK and installs it through the library plugin; Android itself checks
+// it's signed with the same key as the installed app. Other builds can't replace themselves, so
+// they get a link to download it instead.
 import { invoke } from "@tauri-apps/api/core";
 
 const RELEASES_API = "https://api.github.com/repos/aaripurna/lontar/releases/latest";
@@ -22,6 +24,16 @@ export function isNewer(version, than) {
 export function downloadUrl(release, android) {
   const apk = android && release.assets?.find((a) => a.name.endsWith(".apk"));
   return apk ? apk.browser_download_url : release.html_url;
+}
+
+/**
+ * The release's APK as { url, sha256 }, or null if it has none or GitHub didn't list its
+ * SHA-256 (assets uploaded before mid-2025 have no `digest`).
+ */
+export function apkAsset(release) {
+  const apk = release.assets?.find((a) => a.name.endsWith(".apk"));
+  const sha256 = /^sha256:([0-9a-f]{64})$/.exec(apk?.digest ?? "")?.[1];
+  return sha256 ? { url: apk.browser_download_url, sha256 } : null;
 }
 
 /**
@@ -47,6 +59,12 @@ export async function findUpdate(currentVersion) {
   if (!res.ok) throw new Error(`GitHub answered ${res.status}`);
   const release = await res.json();
   if (!isNewer(release.tag_name, currentVersion)) return null;
+  const version = release.tag_name.replace(/^v/, "");
+  const apk = method === "apk" && apkAsset(release);
+  if (apk) {
+    // Android restarts the app once the new version is installed.
+    return { version, install: () => invoke("plugin:library|install_update", apk) };
+  }
   const android = /Android/i.test(navigator.userAgent);
-  return { version: release.tag_name.replace(/^v/, ""), url: downloadUrl(release, android) };
+  return { version, url: downloadUrl(release, android) };
 }

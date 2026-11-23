@@ -80,7 +80,8 @@ Lontar isn't in the App Store. To install the `.ipa` file you need a sideloading
 When a new version comes out, Lontar shows a notice at the top of your library.
 
 - **Windows and Mac:** click **Update**. Lontar downloads the new version, installs it and restarts.
-- **Android, Linux and iPhone:** tap **Download** to get the new version, then install it the same way as the first time.
+- **Android:** tap **Update**. Lontar downloads the new version and Android installs it. The first time, Android asks you to allow Lontar to install apps and to confirm the update; on Android 12 and later, updates after that install without asking.
+- **Linux and iPhone:** tap **Download** to get the new version, then install it the same way as the first time.
 
 To check, Lontar asks GitHub for the latest version each time it starts. That is the only time it goes online; your books and reading data never leave your devices.
 

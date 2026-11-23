@@ -7,7 +7,14 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import android.provider.OpenableColumns
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.content.pm.PackageInstaller
+import android.os.Build
 import androidx.activity.result.ActivityResult
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
@@ -35,6 +42,14 @@ class BookArgs {
   lateinit var folderId: String
   // Document URI of the book.
   lateinit var path: String
+}
+
+@InvokeArg
+class InstallUpdateArgs {
+  // The new release's APK on GitHub, checked by the Rust side.
+  lateinit var url: String
+  // Its SHA-256 as GitHub lists it, lowercase hex.
+  lateinit var sha256: String
 }
 
 @InvokeArg
@@ -429,6 +444,132 @@ class LibraryPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.reject(e.message ?: "Failed to delete ${args.sidecarName}")
       }
     }.start()
+  }
+
+  // Downloads the new release's APK, checks it, and installs it over this app with Android's
+  // PackageInstaller. The first time, Android asks to allow "Install unknown apps" for Lontar and
+  // to confirm; on Android 12+, once Lontar has installed itself, later updates need no prompt.
+  // On success Android replaces the app's process, so the frontend rarely hears back; it hears a
+  // rejection if the download fails, the APK isn't ours, or the install is cancelled or fails.
+  @Command
+  fun installUpdate(invoke: Invoke) {
+    val args = invoke.parseArgs(InstallUpdateArgs::class.java)
+    Thread {
+      val apk = java.io.File(activity.cacheDir, "update.apk")
+      try {
+        download(args.url, apk, args.sha256)
+        val info = activity.packageManager.getPackageArchiveInfo(apk.absolutePath, 0)
+          ?: throw Exception("The download isn't an Android app.")
+        if (info.packageName != activity.packageName) {
+          throw Exception("The download isn't Lontar.")
+        }
+        install(apk, invoke)
+      } catch (e: Exception) {
+        invoke.reject(e.message ?: "Failed to download the update")
+      } finally {
+        apk.delete() // the install session keeps its own copy
+      }
+    }.start()
+  }
+
+  // Saves `url` to `file`, failing unless its SHA-256 is `sha256`. GitHub redirects release
+  // downloads to its storage host, which HttpURLConnection follows (both are https).
+  private fun download(url: String, file: java.io.File, sha256: String) {
+    val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+    connection.connectTimeout = 15_000
+    connection.readTimeout = 60_000
+    try {
+      if (connection.responseCode != 200) {
+        throw Exception("GitHub answered ${connection.responseCode}")
+      }
+      val digest = java.security.MessageDigest.getInstance("SHA-256")
+      connection.inputStream.use { input ->
+        file.outputStream().use { output ->
+          val buffer = ByteArray(64 * 1024)
+          while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            digest.update(buffer, 0, read)
+            output.write(buffer, 0, read)
+          }
+        }
+      }
+      val actual = digest.digest().joinToString("") { "%02x".format(it) }
+      if (actual != sha256) throw Exception("The download is damaged. Please try again.")
+    } finally {
+      connection.disconnect()
+    }
+  }
+
+  // Hands `apk` to PackageInstaller and settles `invoke` once Android reports how it went.
+  private fun install(apk: java.io.File, invoke: Invoke) {
+    val installer = activity.packageManager.packageInstaller
+    val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+    params.setAppPackageName(activity.packageName)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+    }
+    val sessionId = installer.createSession(params)
+    try {
+      installer.openSession(sessionId).use { session ->
+        apk.inputStream().use { input ->
+          session.openWrite("lontar.apk", 0, apk.length()).use { output ->
+            input.copyTo(output)
+            session.fsync(output)
+          }
+        }
+        val action = "${activity.packageName}.UPDATE_STATUS.$sessionId"
+        ContextCompat.registerReceiver(
+          activity,
+          InstallStatusReceiver(invoke),
+          IntentFilter(action),
+          ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+          (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
+        val status = PendingIntent.getBroadcast(
+          activity, sessionId, Intent(action).setPackage(activity.packageName), flags
+        )
+        session.commit(status.intentSender)
+      }
+    } catch (e: Exception) {
+      installer.abandonSession(sessionId)
+      throw e
+    }
+  }
+
+  // Hears from PackageInstaller: shows its confirmation screen when it asks for one, and
+  // settles the install once it's done.
+  private inner class InstallStatusReceiver(private val invoke: Invoke) : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+      val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+      if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+        @Suppress("DEPRECATION")
+        val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+        try {
+          activity.startActivity(confirm!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+          finish { invoke.reject("Couldn't open the install prompt") }
+        }
+        return
+      }
+      val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+      finish {
+        when (status) {
+          PackageInstaller.STATUS_SUCCESS -> invoke.resolve()
+          PackageInstaller.STATUS_FAILURE_ABORTED -> invoke.reject("The update was cancelled.")
+          PackageInstaller.STATUS_FAILURE_CONFLICT ->
+            invoke.reject("This update isn't signed like the installed app.")
+          PackageInstaller.STATUS_FAILURE_STORAGE -> invoke.reject("Not enough storage space.")
+          else -> invoke.reject(message ?: "Android couldn't install the update.")
+        }
+      }
+    }
+
+    private fun finish(settle: () -> Unit) {
+      try { activity.unregisterReceiver(this) } catch (_: Exception) {}
+      settle()
+    }
   }
 
   // Kept on while a book is open, so the screen doesn't dim and lock mid-page.

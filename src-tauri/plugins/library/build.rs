@@ -13,6 +13,7 @@ const COMMANDS: &[&str] = &[
     "move_to_background",
     "hide_splash",
     "set_keep_screen_on",
+    "install_update",
 ];
 
 fn main() {

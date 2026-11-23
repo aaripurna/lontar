@@ -84,6 +84,12 @@ struct BarColorsArgs<'a> {
     dark: bool,
 }
 
+#[derive(Serialize)]
+struct InstallUpdateArgs<'a> {
+    url: &'a str,
+    sha256: &'a str,
+}
+
 #[derive(Deserialize)]
 struct OpenedBooksResponse {
     books: Vec<Ebook>,
@@ -209,6 +215,17 @@ impl<R: Runtime> Library<R> {
         }
         self.0
             .run_mobile_plugin::<()>("moveToBackground", ())
+            .map_err(|e| e.to_string())
+    }
+
+    /// Waits until the install is done or has failed; on success Android usually replaces the
+    /// app's process first.
+    pub fn install_update(&self, url: &str, sha256: &str) -> Result<(), String> {
+        if cfg!(target_os = "ios") {
+            return Err("iOS can't install updates itself".into());
+        }
+        self.0
+            .run_mobile_plugin::<()>("installUpdate", InstallUpdateArgs { url, sha256 })
             .map_err(|e| e.to_string())
     }
 

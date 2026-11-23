@@ -1,6 +1,6 @@
 ## Default Permission
 
-Allows picking library folders, scanning them for ebooks, opening books, and reading, writing and moving each book's .lontar sidecar, colouring the system bars, and receiving books opened from the OS.
+Allows picking library folders, scanning them for ebooks, opening books, and reading, writing and moving each book's .lontar sidecar, colouring the system bars, receiving books opened from the OS, and installing Android updates.
 
 #### This default permission set includes the following:
 
@@ -18,6 +18,7 @@ Allows picking library folders, scanning them for ebooks, opening books, and rea
 - `allow-move-to-background`
 - `allow-hide-splash`
 - `allow-set-keep-screen-on`
+- `allow-install-update`
 
 ## Permission Table
 
@@ -102,6 +103,32 @@ Enables the hide_splash command without any pre-configured scope.
 <td>
 
 Denies the hide_splash command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:allow-install-update`
+
+</td>
+<td>
+
+Enables the install_update command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`library:deny-install-update`
+
+</td>
+<td>
+
+Denies the install_update command without any pre-configured scope.
 
 </td>
 </tr>

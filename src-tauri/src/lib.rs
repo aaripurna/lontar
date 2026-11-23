@@ -1,9 +1,12 @@
-/// How this build gets new versions: "install" where the updater can install them (the Windows
-/// installer and the macOS app), "notify" elsewhere, where the library links to the download.
+/// How this build gets new versions: "install" where Tauri's updater can install them (the
+/// Windows installer and the macOS app), "apk" on Android, which downloads the APK and installs it
+/// through the library plugin, and "notify" elsewhere, where the library links to the download.
 #[tauri::command]
 fn update_method() -> &'static str {
     if cfg!(any(windows, target_os = "macos")) {
         "install"
+    } else if cfg!(target_os = "android") {
+        "apk"
     } else {
         "notify"
     }
