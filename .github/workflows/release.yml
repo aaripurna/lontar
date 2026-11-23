@@ -34,7 +34,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          targets: aarch64-linux-android,armv7-linux-androideabi
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -55,8 +55,10 @@ jobs:
             echo "keyAlias=lontar"
           } > keystore.properties
 
+      # ARM only: every phone, and Intel Chromebooks run ARM apps through translation. Each CPU
+      # adds its own ~7 MB copy of the app, stored uncompressed, and x86 is mostly emulators.
       - name: Build APK
-        run: bun run tauri android build --apk
+        run: bun run tauri android build --apk --target aarch64 --target armv7
 
       - name: Rename APK
         run: |
