@@ -1,0 +1,38 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Architectures: amd64
+Codename: stable
+Components: main
+Date: Mon, 23 Nov 2026 02:43:41 +0000
+Label: Lontar
+Origin: Lontar
+Suite: stable
+MD5Sum:
+ 57b392adcd0889fc927233ed38672ee9              826 main/binary-amd64/Packages
+ 63fff95a95dc39796d6f6c25196050a9              570 main/binary-amd64/Packages.gz
+SHA1:
+ ac4ce1ee575f3540ca2656ff799fa6b5b69b1d54              826 main/binary-amd64/Packages
+ 59eff22dada1e14f1d0fff8113e0ad4eaff1faf3              570 main/binary-amd64/Packages.gz
+SHA256:
+ a102f52f6d5f95ff65c5973be6d2f3a807d14b485e5421566f94e2f4eb6096a0              826 main/binary-amd64/Packages
+ 14f270cd1c02adfdb39297d67fe638554fc059eeb8144a025ad34c17ce87eacd              570 main/binary-amd64/Packages.gz
+SHA512:
+ eeb70f73774da304852387d40a2e47a32225cabdc8f10693689280cb63c9bff095ae31e5e4db88b66746f5b086866202fdb00bc71f0d4e3e716260a76fa15145              826 main/binary-amd64/Packages
+ eae8bbc82c9e654275afc3adab340dc55e1722fd1f761d4e08884386de7d2c3b42c177a453f01ff65804383c53d4cd778e78a1cbfa7e9375f0436cf09ab4000f              570 main/binary-amd64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEEVPrCB1jSLu+qTCEz/OvEWk6i5eMFAmsDqF0ACgkQ/OvEWk6i
+5eOYng//cJooVbXNIGiljnTZWuJAOyCkzjj34qC5+Mn4c770hSRnjBeXcGiD/f1f
+tXh5DapOKYNFw2JFADuM2wGfFmJWpRucvdERQg3PlaDutLOxLnyr3PfyOl8AArGv
+lcYFDlNS1uBHNs5yODb+MXaFaJYqPqZ0FmBffPnIjRMtRz1n6Y9VSr/9yCRLl2Ie
+PWOrA4KZTz3ZL32RbgVt7KCToOKJfRnNSpSpcvU7tkZqx+uB8DmY2Dx8BDNvoGWE
+MU9JXSc7rQFkHEtewThmcWILqPHaQcRQdiPM+AuWIyDHGzk+3jzDoGkuoZ9tVm+g
+Ec+4H/EAGbY0r4FnBUpbvQ/I7PyEeufqllBERrrofORLclB+MtunUN+llIhTaIil
+417mB1DwFEskUvJs/ecdzzhgefdSFHuDDXUdd57gdVvmbzCitHnMQyM3MB69AmmO
+4DSw9oBKZN8lYUxb4SCVN+sd4hazkX68fkQCcbO6zaW71Yzi5UrDfar46deXwTzx
+CiTMimfIyy8pSvyJpkUO/mYT5AQ29UFE07lDLkTYgGB1LmnNB5bm6ZhgQtgrHlu2
+428n7zl5LBiUY8wa08qu9fuWfbQFdKznxg8WGFYOcnW1FrFJQEu7Op5FjR4b43a0
+lTMVxcyEjOk0eHd17VD7IjE+2A32fenQE0FoWRd6AHH+VMO2xrs=
+=vrJv
+-----END PGP SIGNATURE-----

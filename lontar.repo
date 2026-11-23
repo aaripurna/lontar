@@ -1,0 +1,8 @@
+# Lontar's DNF repository, installed by the lontar package so it updates with the system.
+[lontar]
+name=Lontar
+baseurl=https://aaripurna.github.io/lontar/rpm
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-lontar

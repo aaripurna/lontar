@@ -1,0 +1,16 @@
+Package: lontar
+Architecture: amd64
+Version: 1.1.4
+Priority: optional
+Maintainer: you
+Installed-Size: 9365
+Depends: libwebkit2gtk-4.1-0, libgtk-3-0
+Filename: pool/main/lontar-v1.1.4-amd64.deb
+Size: 5203164
+MD5sum: 6799938ab2331720ac9f129983e695ad
+SHA1: a70383432c9d182c9f29a67359b112c1f457acc1
+SHA256: 37283087c018aa71d903a2a083cddc4c628b4c10e09bbd6c32e9d18acb483e75
+SHA512: d8c3bd2e92121b0187641cac429b8d42f2b763bad3c60d10e1c3f07c535579fd321ac504ba10ecdda18503397c2731fad0f42bfa100cc8cc8eb77ef3af700616
+Description: Read your ebooks and keep your place on every device
+ A simple ebook reader for EPUB, PDF, Kindle, FB2 and comic book files. It remembers where you stopped in every book, and keeps your place, bookmarks and highlights in a small file next to each book, so a synced folder carries them to your other devices.
+

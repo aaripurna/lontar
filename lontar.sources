@@ -1,0 +1,7 @@
+# Lontar's APT repository, installed by the lontar package so it updates with the system.
+Types: deb
+URIs: https://aaripurna.github.io/lontar/apt
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: /usr/share/keyrings/lontar.asc

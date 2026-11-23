@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lontar for Linux</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 44rem; margin: 2rem auto; padding: 0 1rem; }
+  pre { background: #f2f2f2; padding: 0.75rem; overflow-x: auto; }
+  @media (prefers-color-scheme: dark) { body { background: #1c1c1c; color: #e6e6e6; } pre { background: #2a2a2a; } a { color: #8ab4f8; } }
+</style>
+</head>
+<body>
+<h1>Lontar for Linux</h1>
+<p>These are the APT and DNF repositories Lontar updates from. Installing the <code>.deb</code> or
+<code>.rpm</code> from the <a href="https://github.com/aaripurna/lontar/releases/latest">latest release</a>
+adds them for you, so new versions then arrive with your system's updates.</p>
+
+<h2>Debian and Ubuntu</h2>
+<pre>sudo curl -fsSLo /usr/share/keyrings/lontar.asc https://aaripurna.github.io/lontar/lontar.asc
+sudo curl -fsSLo /etc/apt/sources.list.d/lontar.sources https://aaripurna.github.io/lontar/lontar.sources
+sudo apt update &amp;&amp; sudo apt install lontar</pre>
+
+<h2>Fedora</h2>
+<pre>sudo curl -fsSLo /etc/pki/rpm-gpg/RPM-GPG-KEY-lontar https://aaripurna.github.io/lontar/lontar.asc
+sudo curl -fsSLo /etc/yum.repos.d/lontar.repo https://aaripurna.github.io/lontar/lontar.repo
+sudo dnf install lontar</pre>
+</body>
+</html>
