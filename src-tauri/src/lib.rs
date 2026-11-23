@@ -1,12 +1,26 @@
 /// How this build gets new versions: "install" where Tauri's updater can install them (the
 /// Windows installer and the macOS app), "apk" on Android, which downloads the APK and installs it
-/// through the library plugin, and "notify" elsewhere, where the library links to the download.
+/// through the library plugin, "system" for a .deb or .rpm, which added Lontar's APT or DNF
+/// repository (see linux/) so the system's updates bring it, and "notify" elsewhere, where the
+/// library links to the download. "none" for any build not made by the release workflow, which
+/// sets LONTAR_RELEASE: local and development builds carry the placeholder version from
+/// tauri.conf.json, so every release would look newer, and must never replace themselves.
 #[tauri::command]
 fn update_method() -> &'static str {
-    if cfg!(any(windows, target_os = "macos")) {
+    const LINUX_REPOS: [&str; 2] = [
+        "/etc/apt/sources.list.d/lontar.sources",
+        "/etc/yum.repos.d/lontar.repo",
+    ];
+    if option_env!("LONTAR_RELEASE").is_none() {
+        "none"
+    } else if cfg!(any(windows, target_os = "macos")) {
         "install"
     } else if cfg!(target_os = "android") {
         "apk"
+    } else if cfg!(target_os = "linux")
+        && LINUX_REPOS.iter().any(|p| std::path::Path::new(p).exists())
+    {
+        "system"
     } else {
         "notify"
     }

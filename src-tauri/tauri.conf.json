@@ -100,7 +100,9 @@
     "linux": {
       "deb": {
         "files": {
-          "/usr/share/metainfo/io.github.aaripurna.Lontar.metainfo.xml": "../flatpak/io.github.aaripurna.Lontar.metainfo.xml"
+          "/usr/share/metainfo/io.github.aaripurna.Lontar.metainfo.xml": "../flatpak/io.github.aaripurna.Lontar.metainfo.xml",
+          "/etc/apt/sources.list.d/lontar.sources": "../linux/lontar.sources",
+          "/usr/share/keyrings/lontar.asc": "../linux/lontar.asc"
         }
       },
       "rpm": {
@@ -109,7 +111,9 @@
           "gtk3"
         ],
         "files": {
-          "/usr/share/metainfo/io.github.aaripurna.Lontar.metainfo.xml": "../flatpak/io.github.aaripurna.Lontar.metainfo.xml"
+          "/usr/share/metainfo/io.github.aaripurna.Lontar.metainfo.xml": "../flatpak/io.github.aaripurna.Lontar.metainfo.xml",
+          "/etc/yum.repos.d/lontar.repo": "../linux/lontar.repo",
+          "/etc/pki/rpm-gpg/RPM-GPG-KEY-lontar": "../linux/lontar.asc"
         }
       }
     }

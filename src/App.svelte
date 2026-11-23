@@ -117,9 +117,8 @@
     }
   }
 
-  // Development builds carry the version in tauri.conf.json, so every release looks newer.
+  // Only release builds look (see update_method in src-tauri/src/lib.rs).
   function checkForUpdate(current) {
-    if (import.meta.env.DEV) return;
     findUpdate(current).then(
       (found) => (update = found),
       (e) => console.warn("Couldn't check for a new version", e),
@@ -417,11 +416,16 @@
     {#if update && update.version !== dismissedUpdate}
       <div class="update">
         <span class="update-text">
-          {updateError || (updating ? `Updating to Lontar ${update.version}…` : `Lontar ${update.version} is available.`)}
+          {updateError ||
+            (updating
+              ? `Updating to Lontar ${update.version}…`
+              : update.system
+                ? `Lontar ${update.version} is available in your system's software updates.`
+                : `Lontar ${update.version} is available.`)}
         </span>
         {#if update.install}
           <button onclick={installUpdate} disabled={updating}>Update</button>
-        {:else}
+        {:else if update.url}
           <button onclick={() => openUrl(update.url)}>Download</button>
         {/if}
         <button class="dismiss" onclick={dismissUpdate} disabled={updating} aria-label="Not now" title="Not now"

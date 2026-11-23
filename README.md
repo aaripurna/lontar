@@ -81,7 +81,8 @@ When a new version comes out, Lontar shows a notice at the top of your library.
 
 - **Windows and Mac:** click **Update**. Lontar downloads the new version, installs it and restarts.
 - **Android:** tap **Update**. Lontar downloads the new version and Android installs it. The first time, Android asks you to allow Lontar to install apps and to confirm the update; on Android 12 and later, updates after that install without asking.
-- **Linux and iPhone:** tap **Download** to get the new version, then install it the same way as the first time.
+- **Linux (.deb and .rpm):** installing the package also adds Lontar's APT or DNF repository, so new versions arrive with your system's updates (`sudo apt upgrade`, `sudo dnf upgrade`, or your software center). Lontar tells you when one is out. If you installed version 1.1.2 or older, install the new `.deb` or `.rpm` by hand once. To set up the repository without the package, see [aaripurna.github.io/lontar](https://aaripurna.github.io/lontar/).
+- **Flatpak and iPhone:** tap **Download** to get the new version, then install it the same way as the first time.
 
 To check, Lontar asks GitHub for the latest version each time it starts. That is the only time it goes online; your books and reading data never leave your devices.
 
@@ -122,7 +123,7 @@ bun run tauri android dev    # Android emulator or device
 bun test src                 # tests
 ```
 
-To release, push a version tag such as `v1.2.0`. CI uses the tag as the app version, so the `version` in `src-tauri/tauri.conf.json` only applies to local builds. CI builds a signed Android APK, an unsigned Windows installer, a universal macOS DMG, an unsigned iOS IPA, a Linux `.deb` and `.rpm` and a Flatpak bundle, and attaches them to the GitHub release. The Windows installer and the macOS app are also signed for the in-app updater when the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets are set, and the release gets the `latest.json` the apps check. The DMG is only Developer ID signed and notarized when the `APPLE_*` secrets are set (see `.github/workflows/release.yml`).
+To release, push a version tag such as `v1.2.0`. CI uses the tag as the app version, so the `version` in `src-tauri/tauri.conf.json` only applies to local builds. CI builds a signed Android APK, an unsigned Windows installer, a universal macOS DMG, an unsigned iOS IPA, a Linux `.deb` and `.rpm` and a Flatpak bundle, and attaches them to the GitHub release. The Windows installer and the macOS app are also signed for the in-app updater when the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets are set, and the release gets the `latest.json` the apps check. When the `LINUX_REPO_GPG_KEY` secret is set (make it with `scripts/linux-repo-key.sh`), CI signs the `.rpm` and publishes the APT and DNF repositories to the `gh-pages` branch, served by GitHub Pages; pre-release tags such as `v1.2.0-beta.1` don't go to them. The DMG is only Developer ID signed and notarized when the `APPLE_*` secrets are set (see `.github/workflows/release.yml`).
 
 ## License
 

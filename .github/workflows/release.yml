@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+env:
+  # Marks the builds as releases, which check for new versions (update_method in src-tauri/src/lib.rs).
+  LONTAR_RELEASE: "1"
+
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -236,6 +240,11 @@ jobs:
   linux:
     # Oldest supported Ubuntu, so the binary links against an old glibc and runs on more distros.
     runs-on: ubuntu-22.04
+    env:
+      # Signs the .rpm and the APT and DNF repositories (see scripts/linux-repo-key.sh).
+      LINUX_REPO_GPG_KEY: ${{ secrets.LINUX_REPO_GPG_KEY }}
+    outputs:
+      signed: ${{ steps.sign.outputs.signed }}
     steps:
       - uses: actions/checkout@v4
 
@@ -274,16 +283,99 @@ jobs:
           cp src-tauri/target/release/bundle/deb/*.deb "lontar-${GITHUB_REF_NAME}-amd64.deb"
           cp src-tauri/target/release/bundle/rpm/*.rpm "lontar-${GITHUB_REF_NAME}-x86_64.rpm"
 
+      # DNF checks packages from the repository against the key the .rpm installed. Without the
+      # secret the .rpm stays unsigned and the linux-repo job doesn't run.
+      - name: Sign the .rpm
+        id: sign
+        if: env.LINUX_REPO_GPG_KEY != ''
+        run: |
+          sudo apt-get install -y rpm
+          echo "$LINUX_REPO_GPG_KEY" | gpg --batch --import
+          rpmsign --addsign --define "_gpg_name Lontar packages" "lontar-${GITHUB_REF_NAME}-x86_64.rpm"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
       - uses: actions/upload-artifact@v4
         with:
           name: deb
           path: lontar-${{ github.ref_name }}-amd64.deb
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpm
+          path: lontar-${{ github.ref_name }}-x86_64.rpm
 
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             lontar-${{ github.ref_name }}-amd64.deb
             lontar-${{ github.ref_name }}-x86_64.rpm
+
+  linux-repo:
+    # The APT and DNF repositories that installed .deb and .rpm packages update from (they add
+    # them, see linux/), published on GitHub Pages from the gh-pages branch. Each release replaces
+    # them with only its own packages. Pre-releases (v1.2.0-beta.1) stay out.
+    needs: linux
+    if: needs.linux.outputs.signed == 'true' && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    env:
+      LINUX_REPO_GPG_KEY: ${{ secrets.LINUX_REPO_GPG_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: deb
+          path: packages
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: rpm
+          path: packages
+
+      - name: Install repository tools
+        run: sudo apt-get update && sudo apt-get install -y apt-utils createrepo-c
+
+      - name: Build the repositories
+        run: |
+          echo "$LINUX_REPO_GPG_KEY" | gpg --batch --import
+          sign() { gpg --batch --yes --local-user "Lontar packages" "$@"; }
+          site=site
+          mkdir -p "$site/apt/pool/main" "$site/apt/dists/stable/main/binary-amd64" "$site/rpm"
+          cp linux/lontar.asc linux/lontar.sources linux/lontar.repo linux/index.html "$site/"
+          touch "$site/.nojekyll"
+
+          cp packages/*.deb "$site/apt/pool/main/"
+          cd "$site/apt"
+          apt-ftparchive packages pool > dists/stable/main/binary-amd64/Packages
+          gzip -k9 dists/stable/main/binary-amd64/Packages
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin=Lontar \
+            -o APT::FTPArchive::Release::Label=Lontar \
+            -o APT::FTPArchive::Release::Suite=stable \
+            -o APT::FTPArchive::Release::Codename=stable \
+            -o APT::FTPArchive::Release::Architectures=amd64 \
+            -o APT::FTPArchive::Release::Components=main \
+            release dists/stable > "$RUNNER_TEMP/Release"
+          mv "$RUNNER_TEMP/Release" dists/stable/Release
+          sign --clearsign -o dists/stable/InRelease dists/stable/Release
+          sign --armor --detach-sign -o dists/stable/Release.gpg dists/stable/Release
+          cd - > /dev/null
+
+          cp packages/*.rpm "$site/rpm/"
+          createrepo_c "$site/rpm"
+          sign --armor --detach-sign "$site/rpm/repodata/repomd.xml"
+          find "$site" -type f | sort
+
+      # A fresh single-commit branch each time, so old packages don't pile up in git history.
+      - name: Publish to gh-pages
+        working-directory: site
+        run: |
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Linux repositories for ${GITHUB_REF_NAME}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
 
   flatpak:
     needs: linux

@@ -2,7 +2,8 @@
 // Tauri's updater (from latest.json on the latest GitHub release, signed by CI). Android
 // downloads the release's APK and installs it through the library plugin; Android itself checks
 // it's signed with the same key as the installed app. Other builds can't replace themselves, so
-// they get a link to download it instead.
+// they get a link to download it instead, except a .deb or .rpm, whose APT or DNF repository
+// brings it with the system's updates.
 import { invoke } from "@tauri-apps/api/core";
 
 const RELEASES_API = "https://api.github.com/repos/aaripurna/lontar/releases/latest";
@@ -38,10 +39,12 @@ export function apkAsset(release) {
 
 /**
  * Returns the newer release as { version, install } (install downloads it, installs it and
- * restarts) or { version, url } (a page to download it from), or null if this is the latest.
+ * restarts), { version, system: true } (the system's software updates bring it) or
+ * { version, url } (a page to download it from), or null if this is the latest.
  */
 export async function findUpdate(currentVersion) {
   const method = await invoke("update_method");
+  if (method === "none") return null; // not a release build
   if (method === "install") {
     const { check } = await import("@tauri-apps/plugin-updater");
     const update = await check();
@@ -60,6 +63,7 @@ export async function findUpdate(currentVersion) {
   const release = await res.json();
   if (!isNewer(release.tag_name, currentVersion)) return null;
   const version = release.tag_name.replace(/^v/, "");
+  if (method === "system") return { version, system: true };
   const apk = method === "apk" && apkAsset(release);
   if (apk) {
     // Android restarts the app once the new version is installed.
